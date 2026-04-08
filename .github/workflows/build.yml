@@ -1,4 +1,4 @@
-name: Build DocSuite Ultimate
+name: Build DocSuite Pro 2026
 
 on:
   push:
@@ -21,16 +21,18 @@ jobs:
     - name: Install Dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install customtkinter img2pdf pdf2image pandas openpyxl pdfplumber pillow pyinstaller
+        # تثبيت كل المكتبات الموجودة في كودك الجديد
+        pip install customtkinter img2pdf pdf2image pandas openpyxl pdfplumber pytesseract pillow pyinstaller
 
-    - name: Build EXE (Optimized OneFile)
+    - name: Build EXE (Ultimate Edition)
       run: |
-        # استخدمنا --onefile تاني عشان نريحك من الفولدرات
-        # وضفنا ميزة الـ No-Console عشان السرعة
-        pyinstaller --noconsole --onefile --collect-all customtkinter --icon=app_icon.ico --name "DocSuite_Pro" main.py
+        # --onefile: عشان يطلع ملف واحد سهل النقل
+        # --noconsole: عشان ميتفتحش شاشة سوداء ورا البرنامج
+        # --collect-all: بنجمع ملفات customtkinter عشان الألوان تظهر صح
+        pyinstaller --noconsole --onefile --collect-all customtkinter --icon=app_icon.ico --name "DocSuite_Pro_2026" main.py
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: DocSuite_Final_EXE
-        path: dist/DocSuite_Pro.exe
+        name: DocSuite_Pro_2026_EXE
+        path: dist/DocSuite_Pro_2026.exe
