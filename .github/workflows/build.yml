@@ -1,4 +1,4 @@
-name: Build DocSuite Master Edition
+name: Build DocSuite Ultimate
 
 on:
   push:
@@ -18,20 +18,19 @@ jobs:
       with:
         python-version: '3.12'
 
-    - name: Install dependencies
+    - name: Install Dependencies
       run: |
         python -m pip install --upgrade pip
-        # لاحظ إضافة PyPDF2 و pdfplumber و openpyxl لضمان شغل الإكسل
-        pip install customtkinter img2pdf pdf2image pandas openpyxl pdfplumber pytesseract pillow PyPDF2 pyinstaller
+        pip install customtkinter img2pdf pdf2image pandas openpyxl pdfplumber pillow pyinstaller
 
-    - name: Build EXE (The Fast Way)
+    - name: Build EXE (Optimized OneFile)
       run: |
-        # استخدمنا --onedir عشان يفتح "طلقة" على الويندوز
-        # واستخدمنا --collect-all customtkinter عشان الألوان تظهر صح
-        pyinstaller --noconsole --onedir --collect-all customtkinter --icon=NONE --name "DocSuite_Pro" main.py
+        # استخدمنا --onefile تاني عشان نريحك من الفولدرات
+        # وضفنا ميزة الـ No-Console عشان السرعة
+        pyinstaller --noconsole --onefile --collect-all customtkinter --icon=app_icon.ico --name "DocSuite_Pro" main.py
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: DocSuite_Windows_Package
-        path: dist/DocSuite_Pro/
+        name: DocSuite_Final_EXE
+        path: dist/DocSuite_Pro.exe
