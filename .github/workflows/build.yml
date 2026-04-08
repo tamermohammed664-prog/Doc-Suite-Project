@@ -21,15 +21,16 @@ jobs:
     - name: Install Dependencies
       run: |
         python -m pip install --upgrade pip
-        # تثبيت كل المكتبات الموجودة في كودك الجديد
-        pip install customtkinter img2pdf pdf2image pandas openpyxl pdfplumber pytesseract pillow pyinstaller
+        # تثبيت كل المكتبات اللازمة لعمل الكود والتحويل
+        pip install customtkinter img2pdf pandas openpyxl pdfplumber pytesseract pillow pyinstaller pymupdf pypdf arabic-reshaper python-bidi reportlab
 
     - name: Build EXE (Ultimate Edition)
       run: |
-        # --onefile: عشان يطلع ملف واحد سهل النقل
-        # --noconsole: عشان ميتفتحش شاشة سوداء ورا البرنامج
-        # --collect-all: بنجمع ملفات customtkinter عشان الألوان تظهر صح
-        pyinstaller --noconsole --onefile --collect-all customtkinter --icon=app_icon.ico --name "DocSuite_Pro_2026" main.py
+        # --onefile: لضغط البرنامج في ملف واحد
+        # --noconsole: لإخفاء نافذة التيرمينال عند التشغيل
+        # --collect-all: لضمان ظهور ثيمات customtkinter بشكل صحيح
+        # --icon: لدمج أيقونتك الخاصة بالبرنامج
+        pyinstaller --noconsole --onefile --collect-all customtkinter --icon="app_icon.ico" --name "DocSuite_Pro_2026" main.py
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
