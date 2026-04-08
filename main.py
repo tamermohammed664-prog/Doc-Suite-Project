@@ -3,11 +3,14 @@ from tkinter import filedialog, messagebox
 import img2pdf
 import os
 from pdf2image import convert_from_path
-import tabula
 import pandas as pd
+import pdfplumber
+import threading
+from PIL import Image
+import pytesseract
 
-# Appearance Settings
-ctk.set_appearance_mode("light")
+# إعدادات المظهر الفخم باللون الأزرق
+ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
 
@@ -15,157 +18,153 @@ class DocSuiteApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        # Window Configuration
-        self.title("All-in-One Doc Suite - Turbo Mode")
-        self.geometry("800x550")
+        self.title("DocSuite Pro - Edition 2026")
+        self.geometry("700x600")
         self.resizable(False, False)
 
-        # Grid Layout
-        self.grid_columnconfigure(1, weight=1)
-        self.grid_rowconfigure(0, weight=1)
-
         # --- Sidebar ---
-        self.sidebar = ctk.CTkFrame(self, width=200, corner_radius=0)
-        self.sidebar.grid(row=0, column=0, sticky="nsew")
+        self.sidebar = ctk.CTkFrame(self, width=220, corner_radius=0, fg_color="#1a1a1a")
+        self.sidebar.pack(side="left", fill="y")
 
-        self.logo = ctk.CTkLabel(self.sidebar, text="DOC SUITE", font=ctk.CTkFont(size=18, weight="bold"))
-        self.logo.pack(pady=30)
+        self.logo = ctk.CTkLabel(self.sidebar, text="DOC SUITE", font=ctk.CTkFont(family="Impact", size=26))
+        self.logo.pack(pady=(30, 30))
 
-        btn_font = ctk.CTkFont(size=12)
+        # أزرار العمليات (منفصلة تماماً)
+        btn_font = ctk.CTkFont(size=12, weight="bold")
 
-        self.btn_single = ctk.CTkButton(self.sidebar, text="Images to 1 PDF", corner_radius=20, font=btn_font,
-                                        command=self.images_to_single_pdf)
-        self.btn_single.pack(pady=10, padx=15)
+        # قسم الصور لـ PDF
+        self.add_btn("Images to One PDF", self.images_to_single_pdf, btn_font)
+        self.add_btn("Each Image to PDF", self.images_to_multi_pdf, btn_font)
 
-        self.btn_multi = ctk.CTkButton(self.sidebar, text="Each Image to PDF", corner_radius=20, font=btn_font,
-                                       command=self.images_to_multiple_pdfs)
-        self.btn_multi.pack(pady=10, padx=15)
+        # قسم الصور لـ Excel
+        self.add_btn("Images to One Excel", self.images_to_single_excel, btn_font)
+        self.add_btn("Each Image to Excel", self.images_to_multi_excel, btn_font)
 
-        self.btn_pdf_img = ctk.CTkButton(self.sidebar, text="PDF to Images", corner_radius=20, font=btn_font,
-                                         command=self.pdf_to_images)
-        self.btn_pdf_img.pack(pady=10, padx=15)
+        # قسم الـ PDF
+        self.add_btn("PDF to Images", self.pdf_to_images, btn_font)
+        self.add_btn("PDF to Excel", self.pdf_to_excel, btn_font)
 
-        self.btn_pdf_excel = ctk.CTkButton(self.sidebar, text="PDF to Excel", corner_radius=20, font=btn_font,
-                                           command=self.pdf_to_excel)
-        self.btn_pdf_excel.pack(pady=10, padx=15)
-
-        self.btn_excel_pdf = ctk.CTkButton(self.sidebar, text="Excel to PDF", corner_radius=20, font=btn_font,
-                                           command=self.placeholder)
-        self.btn_excel_pdf.pack(pady=10, padx=15)
+        # --- الإمضاء (محمد بخط مائل) ---
+        self.signature = ctk.CTkLabel(self.sidebar, text="Mohamed",
+                                      font=ctk.CTkFont(family="Lucida Handwriting", size=22, slant="italic"),
+                                      text_color="#3b8ed0")
+        self.signature.pack(side="bottom", pady=25)
 
         # --- Main Area ---
-        self.main_frame = ctk.CTkFrame(self, fg_color="#E8F0F7", corner_radius=25)
-        self.main_frame.grid(row=0, column=1, padx=20, pady=20, sticky="nsew")
+        self.main_frame = ctk.CTkFrame(self, fg_color="#121212", corner_radius=20)
+        self.main_frame.pack(side="right", fill="both", expand=True, padx=15, pady=15)
 
-        self.label = ctk.CTkLabel(self.main_frame, text="All-in-One Doc Suite",
+        self.label = ctk.CTkLabel(self.main_frame, text="Master Control Panel",
                                   font=ctk.CTkFont(size=22, weight="bold"))
-        self.label.pack(pady=20)
+        self.label.pack(pady=(40, 20))
 
-        self.path_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        self.path_frame.pack(fill="x", padx=40)
+        self.path_entry = ctk.CTkEntry(self.main_frame, placeholder_text="Select folder or file path...",
+                                       height=45, width=400, corner_radius=12,
+                                       border_color="#3b8ed0", fg_color="#1e1e1e")
+        self.path_entry.pack(pady=10)
 
-        self.path_entry = ctk.CTkEntry(self.path_frame, placeholder_text="Select folder or file path...",
-                                       corner_radius=15, height=35)
-        self.path_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        self.browse_btn = ctk.CTkButton(self.main_frame, text="BROWSE", font=btn_font,
+                                        command=self.browse, fg_color="#3b8ed0", hover_color="#1f538d",
+                                        height=45, width=150, corner_radius=12)
+        self.browse_btn.pack(pady=20)
 
-        self.browse_btn = ctk.CTkButton(self.path_frame, text="Browse", width=80, corner_radius=15, fg_color="#34495e",
-                                        command=self.browse)
-        self.browse_btn.pack(side="right")
+        self.status_label = ctk.CTkLabel(self.main_frame, text="Ready", text_color="#3b8ed0", font=("Arial", 12))
+        self.status_label.pack(side="bottom", pady=20)
 
-        self.log_box = ctk.CTkTextbox(self.main_frame, corner_radius=15, border_width=1)
-        self.log_box.pack(pady=25, padx=40, fill="both", expand=True)
-        self.log_box.insert("0.0",
-                            "System Ready...\n- For Folder tasks: Select folder.\n- For Single File tasks: Select the file.")
+    def add_btn(self, text, command, font):
+        btn = ctk.CTkButton(self.sidebar, text=text, corner_radius=8, font=font, height=40,
+                            fg_color="#3b8ed0", hover_color="#1f538d",
+                            command=lambda: threading.Thread(target=command, daemon=True).start())
+        btn.pack(pady=8, padx=20, fill="x")
 
     def browse(self):
-        # يفتح اختيار ملف أو فولدر حسب العملية
-        path = filedialog.askdirectory()
-        if not path:  # لو مدسش على فولدر جرب يختار ملف
-            path = filedialog.askopenfilename()
+        path = filedialog.askdirectory() or filedialog.askopenfilename()
         if path:
             self.path_entry.delete(0, 'end')
             self.path_entry.insert(0, path)
 
-    def log(self, text):
-        self.log_box.insert("end", f"\n> {text}")
-        self.log_box.see("end")
+    def update_status(self, text, color="#3b8ed0"):
+        self.status_label.configure(text=text, text_color=color)
 
-    # 1. Images to 1 PDF
+    # --- ميكانيكا العمليات ---
+
     def images_to_single_pdf(self):
-        folder = self.path_entry.get()
-        if not folder or not os.path.isdir(folder):
-            messagebox.showwarning("Warning", "Please select a Folder containing images.")
-            return
+        path = self.path_entry.get()
+        if not path or not os.path.exists(path): return
+        self.update_status("Merging images to PDF...")
         try:
-            imgs = [os.path.join(folder, f) for f in os.listdir(folder) if
-                    f.lower().endswith(('.png', '.jpg', '.jpeg'))]
-            if not imgs:
-                self.log("No images found.")
-                return
-            output = os.path.join(folder, "Merged_Output.pdf")
-            with open(output, "wb") as f:
-                f.write(img2pdf.convert(imgs))
-            self.log(f"Successfully merged into: {output}")
-        except Exception as e:
-            self.log(f"Error: {str(e)}")
+            files = [os.path.join(path, f) for f in os.listdir(path) if
+                     f.lower().endswith(('.png', '.jpg', '.jpeg'))] if os.path.isdir(path) else [path]
+            out = os.path.join(os.path.dirname(files[0]), "Merged_Result.pdf")
+            with open(out, "wb") as f:
+                f.write(img2pdf.convert(files))
+            self.update_status("Done: PDF Created!", "green")
+        except:
+            self.update_status("Error occurred", "red")
 
-    # 2. Each Image to PDF
-    def images_to_multiple_pdfs(self):
-        folder = self.path_entry.get()
-        if not folder or not os.path.isdir(folder):
-            messagebox.showwarning("Warning", "Please select a Folder.")
-            return
+    def images_to_multi_pdf(self):
+        path = self.path_entry.get()
+        if not path or not os.path.isdir(path): return
+        self.update_status("Converting each image...")
         try:
-            for f in os.listdir(folder):
-                if f.lower().endswith(('.png', '.jpg', '.jpeg')):
-                    img_path = os.path.join(folder, f)
-                    output = os.path.join(folder, f"{os.path.splitext(f)[0]}.pdf")
-                    with open(output, "wb") as pdf_file:
-                        pdf_file.write(img2pdf.convert(img_path))
-            self.log("All images converted to individual PDFs.")
-        except Exception as e:
-            self.log(f"Error: {str(e)}")
+            files = [os.path.join(path, f) for f in os.listdir(path) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+            for f in files:
+                with open(os.path.splitext(f)[0] + ".pdf", "wb") as pdf: pdf.write(img2pdf.convert(f))
+            self.update_status(f"Done: {len(files)} PDFs created!", "green")
+        except:
+            self.update_status("Error occurred", "red")
 
-    # 3. PDF to Images
+    def images_to_single_excel(self):
+        path = self.path_entry.get()
+        if not path: return
+        self.update_status("OCR in progress (One File)...")
+        try:
+            files = [os.path.join(path, f) for f in os.listdir(path) if
+                     f.lower().endswith(('.png', '.jpg', '.jpeg'))] if os.path.isdir(path) else [path]
+            out = os.path.join(os.path.dirname(files[0]), "Images_Collection.xlsx")
+            with pd.ExcelWriter(out) as writer:
+                for i, f in enumerate(files):
+                    text = pytesseract.image_to_string(Image.open(f))
+                    pd.DataFrame([l.split() for l in text.split('\n') if l.strip()]).to_excel(writer,
+                                                                                              sheet_name=f"Page_{i + 1}",
+                                                                                              index=False, header=False)
+            self.update_status("Excel Merged!", "green")
+        except:
+            self.update_status("OCR Failed", "red")
+
+    def images_to_multi_excel(self):
+        path = self.path_entry.get()
+        if not path or not os.path.isdir(path): return
+        self.update_status("OCR in progress (Multi Files)...")
+        try:
+            files = [os.path.join(path, f) for f in os.listdir(path) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+            for f in files:
+                text = pytesseract.image_to_string(Image.open(f))
+                pd.DataFrame([l.split() for l in text.split('\n') if l.strip()]).to_excel(
+                    os.path.splitext(f)[0] + ".xlsx", index=False, header=False)
+            self.update_status("Multiple Excels created!", "green")
+        except:
+            self.update_status("OCR Failed", "red")
+
     def pdf_to_images(self):
-        file_path = self.path_entry.get()
-        if not file_path or not file_path.lower().endswith('.pdf'):
-            messagebox.showwarning("Warning", "Please select a PDF file.")
-            return
-        try:
-            images = convert_from_path(file_path)
-            folder = os.path.dirname(file_path)
-            for i, image in enumerate(images):
-                image.save(os.path.join(folder, f'Page_{i + 1}.jpg'), 'JPEG')
-            self.log(f"Extracted {len(images)} images to the same folder.")
-        except Exception as e:
-            self.log(f"Error: {str(e)} (Ensure Poppler is installed)")
+        path = self.path_entry.get()
+        if path.lower().endswith('.pdf'):
+            self.update_status("Extracting images...")
+            images = convert_from_path(path)
+            for i, img in enumerate(images): img.save(os.path.join(os.path.dirname(path), f'Page_{i + 1}.jpg'), 'JPEG')
+            self.update_status("Images extracted!", "green")
 
-    # 4. PDF to Excel (The New Feature)
     def pdf_to_excel(self):
-        file_path = self.path_entry.get()
-        if not file_path or not file_path.lower().endswith('.pdf'):
-            messagebox.showwarning("Warning", "Please select a PDF file.")
-            return
-        try:
-            self.log("Analyzing PDF for tables... please wait.")
-            output = os.path.splitext(file_path)[0] + "_Converted.xlsx"
-            # استخراج الجداول من كل الصفحات
-            tables = tabula.read_pdf(file_path, pages='all', multiple_tables=True)
-            if not tables:
-                self.log("No tables found in this PDF.")
-                return
-
-            with pd.ExcelWriter(output) as writer:
-                for i, df in enumerate(tables):
-                    df.to_excel(writer, sheet_name=f'Table_{i + 1}', index=False)
-
-            self.log(f"Excel file created: {output}")
-        except Exception as e:
-            self.log(f"Error: {str(e)}")
-
-    def placeholder(self):
-        self.log("This feature is under development.")
+        path = self.path_entry.get()
+        if path.lower().endswith('.pdf'):
+            self.update_status("Extracting table...")
+            data = []
+            with pdfplumber.open(path) as pdf:
+                for page in pdf.pages:
+                    tbl = page.extract_table()
+                    if tbl: data.extend(tbl)
+            pd.DataFrame(data).to_excel(os.path.splitext(path)[0] + ".xlsx", index=False, header=False)
+            self.update_status("Excel Ready!", "green")
 
 
 if __name__ == "__main__":
