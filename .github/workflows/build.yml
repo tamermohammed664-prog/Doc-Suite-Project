@@ -1,4 +1,4 @@
-name: Build Doc Suite EXE
+name: Build DocSuite Master Edition
 
 on:
   push:
@@ -21,14 +21,17 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install customtkinter img2pdf pdf2image pandas openpyxl tabula-py pyinstaller pillow
+        # لاحظ إضافة PyPDF2 و pdfplumber و openpyxl لضمان شغل الإكسل
+        pip install customtkinter img2pdf pdf2image pandas openpyxl pdfplumber pytesseract pillow PyPDF2 pyinstaller
 
-    - name: Build EXE
+    - name: Build EXE (The Fast Way)
       run: |
-        pyinstaller --noconsole --onefile --collect-all customtkinter --icon=app_icon.ico --name "DocSuite_Pro" main.py
+        # استخدمنا --onedir عشان يفتح "طلقة" على الويندوز
+        # واستخدمنا --collect-all customtkinter عشان الألوان تظهر صح
+        pyinstaller --noconsole --onedir --collect-all customtkinter --icon=NONE --name "DocSuite_Pro" main.py
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: Final-EXE-Package
-        path: dist/DocSuite_Pro.exe
+        name: DocSuite_Windows_Package
+        path: dist/DocSuite_Pro/
