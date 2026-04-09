@@ -2,214 +2,223 @@ import customtkinter as ctk
 from tkinter import filedialog, simpledialog
 import img2pdf
 import os
-import pandas as pd
-import pdfplumber
+import fitz  # PyMuPDF
+from pathlib import Path
 import threading
-from PIL import Image
-import pytesseract
-import pymupdf
-import arabic_reshaper
-from bidi.algorithm import get_display
 from pypdf import PdfReader, PdfWriter
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
-class DocSuiteApp(ctk.CTk):
+
+class DocMaster(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("DocSuite 2026")
-        self.geometry("650x580") # العرض قل جداً لـ 650
+        # --- تعديل الأبعاد: عرض أقل وطول مناسب ---
+        self.title("DocMaster")
+        self.geometry("450x550")
         self.resizable(False, False)
 
-        self.input_path = ""
-        self.output_dir = ""
         self.stop_execution = False
 
-        # --- Sidebar (Narrower) ---
-        self.sidebar = ctk.CTkFrame(self, width=160, corner_radius=0, fg_color="#1a1a1a")
-        self.sidebar.pack(side="left", fill="y")
+        # --- العنوان ---
+        self.label = ctk.CTkLabel(self, text="DOCMASTER PRO", font=("Impact", 28))
+        self.label.pack(pady=10)
 
-        self.logo = ctk.CTkLabel(self.sidebar, text="DOC SUITE", font=ctk.CTkFont(family="Impact", size=20))
-        self.logo.pack(pady=(15, 10))
+        # --- خانة المسار (عرض أصغر) ---
+        self.path_entry = ctk.CTkEntry(self, placeholder_text="Select Folder or File...", width=380, height=35)
+        self.path_entry.pack(pady=5)
 
-        btn_font = ctk.CTkFont(size=11, weight="bold")
+        self.choice_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.choice_frame.pack(pady=5)
+        ctk.CTkButton(self.choice_frame, text="FOLDER", command=self.browse_folder, width=110).grid(row=0, column=0,
+                                                                                                    padx=5)
+        ctk.CTkButton(self.choice_frame, text="FILE", command=self.browse_file, width=110, fg_color="#2c3e50").grid(
+            row=0, column=1, padx=5)
 
-        # الأزرار (أصغر وأقرب لبعض)
-        self.add_btn("IMG to ONE PDF", self.images_to_single_pdf, btn_font)
-        self.add_btn("IMGs to PDFs", self.images_to_multi_pdf, btn_font)
-        self.add_btn("PDF to JPG", self.pdf_to_images, btn_font)
-        self.add_btn("IMG to EXCEL", self.images_to_single_excel, btn_font)
-        self.add_btn("PDF to EXCEL", self.pdf_to_excel, btn_font)
-        self.add_btn("MERGE PDFs", self.merge_pdfs_action, btn_font)
-        self.add_btn("DELETE PAGES", self.delete_pages_action, btn_font)
+        # --- التبويبات (أزرار تحت بعض) ---
+        self.tabview = ctk.CTkTabview(self, width=580, height=220)
+        self.tabview.pack(pady=10, padx=10)
 
-        self.stop_btn = ctk.CTkButton(self.sidebar, text="STOP", corner_radius=6,
-                                      font=btn_font, height=35, fg_color="#c0392b",
-                                      hover_color="#e74c3c", command=self.stop_action)
-        self.stop_btn.pack(pady=20, padx=15, fill="x")
+        self.tab_img = self.tabview.add("Images")
+        self.tab_pdf = self.tabview.add("PDF")
 
-        self.signature = ctk.CTkLabel(self.sidebar, text="Mohamed",
-                                      font=ctk.CTkFont(family="Lucida Handwriting", size=18),
-                                      text_color="#3b8ed0")
+        self.setup_tabs_ui()
+
+        # --- شريط التقدم ---
+        self.progress_label = ctk.CTkLabel(self, text="Progress: 0%", font=("Arial", 11))
+        self.progress_label.pack()
+        self.progress_bar = ctk.CTkProgressBar(self, width=350)
+        self.progress_bar.set(0)
+        self.progress_bar.pack(pady=(0, 10))
+
+        # --- زر التوقف ---
+        self.stop_btn = ctk.CTkButton(self, text="STOP", command=self.stop_task, fg_color="#c0392b", width=200,
+                                      height=35)
+        self.stop_btn.pack(pady=5)
+
+        # --- شريط الحالة ---
+        self.status_label = ctk.CTkLabel(self, text="Status: Ready", text_color="#3b8ed0", font=("Arial", 12, "bold"))
+        self.status_label.pack(pady=5)
+
+        # --- الإمضاء (MOHAMED) ---
+        self.signature = ctk.CTkLabel(self, text="By MOHAMED", font=("Lucida Handwriting", 10, "italic"),
+                                      text_color="gray")
         self.signature.pack(side="bottom", pady=10)
 
-        # --- Main Area (Compact) ---
-        self.main_frame = ctk.CTkFrame(self, fg_color="#121212", corner_radius=15)
-        self.main_frame.pack(side="right", fill="both", expand=True, padx=10, pady=10)
+    def setup_tabs_ui(self):
+        # Image Tab - أزرار تحت بعض
+        ctk.CTkButton(self.tab_img, text="Images to One PDF", command=lambda: self.run_task(self.convert_to_one_pdf),
+                      width=250).pack(pady=10)
+        ctk.CTkButton(self.tab_img, text="Each Image to PDF", command=lambda: self.run_task(self.convert_to_multi_pdf),
+                      width=250).pack(pady=10)
 
-        self.path_entry = ctk.CTkEntry(self.main_frame, placeholder_text="Source Path...", height=32, width=320)
-        self.path_entry.pack(pady=(40, 5))
-        self.browse_btn = ctk.CTkButton(self.main_frame, text="BROWSE SOURCE", height=32, command=self.browse_source)
-        self.browse_btn.pack(pady=5)
+        # PDF Tab - أزرار تحت بعض
+        ctk.CTkButton(self.tab_pdf, text="Merge PDFs", command=lambda: self.run_task(self.merge_pdfs), width=200,
+                      fg_color="#27ae60").pack(pady=8)
+        ctk.CTkButton(self.tab_pdf, text="PDF to JPG", command=lambda: self.run_task(self.pdf_to_images_logic),
+                      width=200, fg_color="#d35400").pack(pady=8)
+        ctk.CTkButton(self.tab_pdf, text="Delete Pages", command=lambda: self.run_task(self.delete_pages), width=200,
+                      fg_color="#8e44ad").pack(pady=8)
 
-        self.dest_entry = ctk.CTkEntry(self.main_frame, placeholder_text="Destination...", height=32, width=320)
-        self.dest_entry.pack(pady=5)
-        self.dest_btn = ctk.CTkButton(self.main_frame, text="SELECT DESTINATION", height=32, command=self.browse_dest, fg_color="#2c3e50")
-        self.dest_btn.pack(pady=5)
-
-        self.status_label = ctk.CTkLabel(self.main_frame, text="Ready", text_color="#3b8ed0", font=("Arial", 11, "bold"))
-        self.status_label.pack(side="bottom", pady=15)
-
-    def add_btn(self, text, command, font):
-        btn = ctk.CTkButton(self.sidebar, text=text, corner_radius=6, font=font, height=30,
-                            command=lambda: self.start_thread(command))
-        btn.pack(pady=3, padx=15, fill="x")
-
-    def start_thread(self, command):
-        self.stop_execution = False
-        threading.Thread(target=command, daemon=True).start()
-
-    def stop_action(self):
+    # --- الوظائف الأساسية (بدون تغيير في المنطق) ---
+    def stop_task(self):
         self.stop_execution = True
-        self.update_status("STOPPED", "red")
+        self.update_status("Stopping...", "orange")
 
-    def browse_source(self):
-        path = filedialog.askopenfilename() or filedialog.askdirectory()
-        if path:
-            self.input_path = path
-            self.path_entry.delete(0, 'end')
-            self.path_entry.insert(0, path)
-
-    def browse_dest(self):
-        path = filedialog.askdirectory()
-        if path:
-            self.output_dir = path
-            self.dest_entry.delete(0, 'end')
-            self.dest_entry.insert(0, path)
-
-    def get_save_path(self, default_name):
-        if self.output_dir:
-            return os.path.join(self.output_dir, default_name)
-        if self.input_path:
-            base_dir = os.path.dirname(self.input_path) if os.path.isfile(self.input_path) else self.input_path
-            return os.path.join(base_dir, default_name)
-        return default_name
+    def update_progress(self, current, total):
+        percent = (current / total)
+        self.progress_bar.set(percent)
+        self.progress_label.configure(text=f"Progress: {int(percent * 100)}%")
+        self.update()
 
     @staticmethod
-    def fix_arabic_text(text):
-        if not text.strip(): return ""
-        return get_display(arabic_reshaper.reshape(text))
+    def get_output_path(base_folder):
+        result_dir = os.path.join(base_folder, "Results")
+        if not os.path.exists(result_dir): os.makedirs(result_dir)
+        return result_dir
 
-    def images_to_single_excel(self):
-        if not self.input_path: return
-        self.update_status("Scanning...")
-        try:
-            img = Image.open(self.input_path)
-            raw_text = pytesseract.image_to_string(img, lang='ara+eng')
-            fixed_text = self.fix_arabic_text(raw_text)
-            rows = [line.split() for line in fixed_text.split('\n') if line.strip()]
-            pd.DataFrame(rows).to_excel(self.get_save_path("OCR.xlsx"), index=False, header=False)
-            self.update_status("Excel OK", "green")
-        except Exception as e: self.update_status(f"Error: {e}", "red")
+    def run_task(self, task_function):
+        self.stop_execution = False
+        self.progress_bar.set(0)
+        threading.Thread(target=task_function, daemon=True).start()
 
-    def merge_pdfs_action(self):
-        self.update_status("Select Files...")
-        files = filedialog.askopenfilenames(filetypes=[("PDF", "*.pdf")])
-        if not files: return
-        try:
-            writer = PdfWriter()
-            for f in files:
-                if self.stop_execution: break
-                reader = PdfReader(f)
-                for page in reader.pages:
-                    if self.stop_execution: break
-                    writer.add_page(page)
-            if not self.stop_execution:
-                writer.write(self.get_save_path("Merged.pdf"))
-                self.update_status("Merged!", "green")
-        except Exception as e: self.update_status("Error", "red")
+    def browse_folder(self):
+        path = filedialog.askdirectory()
+        if path:
+            self.path_entry.delete(0, 'end')
+            self.path_entry.insert(0, os.path.normpath(path))
 
-    def delete_pages_action(self):
-        if not self.input_path.lower().endswith('.pdf'): return
-        pages = simpledialog.askstring("Del", "Pages (1, 3):")
-        if not pages: return
-        try:
-            to_del = [int(p.strip()) - 1 for p in pages.split(',')]
-            reader = PdfReader(self.input_path)
-            writer = PdfWriter()
-            for i in range(len(reader.pages)):
-                if self.stop_execution: break
-                if i not in to_del: writer.add_page(reader.pages[i])
-            if not self.stop_execution:
-                writer.write(self.get_save_path("Edited.pdf"))
-                self.update_status("Deleted!", "green")
-        except Exception as e: self.update_status("Error", "red")
-
-    def pdf_to_images(self):
-        if not self.input_path: return
-        self.update_status("Exporting...")
-        try:
-            doc = pymupdf.open(self.input_path)
-            for i, page in enumerate(doc):
-                if self.stop_execution: break
-                page.get_pixmap(dpi=150).save(self.get_save_path(f"P_{i+1}.jpg"))
-            self.update_status("Done!", "green")
-        except Exception as e: self.update_status("Error", "red")
-
-    def images_to_single_pdf(self):
-        if not self.input_path: return
-        self.update_status("Converting...")
-        try:
-            if os.path.isdir(self.input_path):
-                imgs = [os.path.join(self.input_path, f) for f in os.listdir(self.input_path) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
-            else: imgs = [self.input_path]
-            if imgs and not self.stop_execution:
-                with open(self.get_save_path("Result.pdf"), "wb") as f: f.write(img2pdf.convert(imgs))
-                self.update_status("PDF OK", "green")
-        except Exception as e: self.update_status("Error", "red")
-
-    def images_to_multi_pdf(self):
-        if not self.input_path or not os.path.isdir(self.input_path): return
-        self.update_status("Processing...")
-        try:
-            for f in os.listdir(self.input_path):
-                if self.stop_execution: break
-                if f.lower().endswith(('.png', '.jpg', '.jpeg')):
-                    full_p = os.path.join(self.input_path, f)
-                    with open(self.get_save_path(f"{f}.pdf"), "wb") as out: out.write(img2pdf.convert(full_p))
-            self.update_status("Done!", "green")
-        except Exception as e: self.update_status("Error", "red")
-
-    def pdf_to_excel(self):
-        if not self.input_path: return
-        self.update_status("Tables...")
-        try:
-            data = []
-            with pdfplumber.open(self.input_path) as pdf:
-                for page in pdf.pages:
-                    if self.stop_execution: break
-                    tbl = page.extract_table()
-                    if tbl: data.extend(tbl)
-            if data and not self.stop_execution:
-                pd.DataFrame(data).to_excel(self.get_save_path("Tables.xlsx"), index=False, header=False)
-                self.update_status("Excel OK", "green")
-        except Exception as e: self.update_status("Error", "red")
+    def browse_file(self):
+        path = filedialog.askopenfilename()
+        if path:
+            self.path_entry.delete(0, 'end')
+            self.path_entry.insert(0, os.path.normpath(path))
 
     def update_status(self, text, color="#3b8ed0"):
         self.status_label.configure(text=f"STATUS: {text}", text_color=color)
 
+    def convert_to_one_pdf(self):
+        path = self.path_entry.get().strip()
+        if not os.path.isdir(path): return
+        try:
+            valid_exts = ('.png', '.jpg', '.jpeg')
+            imgs = sorted([str(Path(path) / f) for f in os.listdir(path) if f.lower().endswith(valid_exts)])
+            if imgs:
+                out_dir = self.get_output_path(path)
+                with open(os.path.join(out_dir, "Combined_Images.pdf"), "wb") as f:
+                    f.write(img2pdf.convert(imgs))
+                self.update_progress(1, 1)
+                self.update_status("Saved in Results", "green")
+        except Exception:
+            self.update_status("Error", "red")
+
+    def convert_to_multi_pdf(self):
+        path = self.path_entry.get().strip()
+        if not os.path.isdir(path): return
+        try:
+            out_dir = self.get_output_path(path)
+            files = [f for f in os.listdir(path) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+            total = len(files)
+            for i, f in enumerate(files):
+                if self.stop_execution: break
+                img_p = str(Path(path) / f)
+                with open(os.path.join(out_dir, f"{Path(f).stem}.pdf"), "wb") as out:
+                    out.write(img2pdf.convert(img_p))
+                self.update_progress(i + 1, total)
+            self.update_status("Success!", "green")
+        except Exception:
+            self.update_status("Error", "red")
+
+    def pdf_to_images_logic(self):
+        path = self.path_entry.get().strip()
+        if os.path.isfile(path) and path.lower().endswith('.pdf'):
+            self.process_single_pdf(path)
+            self.update_status("File Done!", "green")
+        elif os.path.isdir(path):
+            pdfs = [str(Path(path) / f) for f in os.listdir(path) if f.lower().endswith('.pdf')]
+            total = len(pdfs)
+            for i, p in enumerate(pdfs):
+                if self.stop_execution: break
+                self.process_single_pdf(p)
+                self.update_progress(i + 1, total)
+            self.update_status("Folder Done!", "green")
+
+    def process_single_pdf(self, file_path):
+        try:
+            doc = fitz.open(file_path)
+            base_name = Path(file_path).stem
+            out_dir = self.get_output_path(Path(file_path).parent)
+            for i, page in enumerate(doc):
+                if self.stop_execution: break
+                pix = page.get_pixmap(dpi=150)
+                suffix = f"_{i + 1}" if len(doc) > 1 else ""
+                pix.save(os.path.join(out_dir, f"{base_name}{suffix}.jpg"))
+            doc.close()
+        except Exception:
+            pass
+
+    def merge_pdfs(self):
+        files = filedialog.askopenfilenames(filetypes=[("PDF Files", "*.pdf")])
+        if not files: return
+        try:
+            writer = PdfWriter()
+            total = len(files)
+            for i, f in enumerate(files):
+                if self.stop_execution: break
+                reader = PdfReader(f)
+                for page in reader.pages: writer.add_page(page)
+                self.update_progress(i + 1, total)
+            out_dir = self.get_output_path(os.path.dirname(files[0]))
+            with open(os.path.join(out_dir, "Merged.pdf"), "wb") as f:
+                writer.write(f)
+            self.update_status("Merged!", "green")
+        except Exception:
+            self.update_status("Failed", "red")
+
+    def delete_pages(self):
+        file_path = filedialog.askopenfilename(filetypes=[("PDF Files", "*.pdf")])
+        if not file_path: return
+        pages_to_del = simpledialog.askstring("Delete", "Pages (e.g. 1, 3):")
+        if not pages_to_del: return
+        try:
+            pages_indices = [int(p.strip()) - 1 for p in pages_to_del.split(',')]
+            reader = PdfReader(file_path)
+            writer = PdfWriter()
+            total = len(reader.pages)
+            for i in range(total):
+                if self.stop_execution: break
+                if i not in pages_indices: writer.add_page(reader.pages[i])
+                self.update_progress(i + 1, total)
+            out_dir = self.get_output_path(os.path.dirname(file_path))
+            with open(os.path.join(out_dir, f"{Path(file_path).stem}_New.pdf"), "wb") as f:
+                writer.write(f)
+            self.update_status("Deleted!", "green")
+        except Exception:
+            self.update_status("Error", "red")
+
+
 if __name__ == "__main__":
-    app = DocSuiteApp()
+    app = DocMaster()
     app.mainloop()
