@@ -2,3 +2,5 @@ customtkinter
 img2pdf
 pymupdf
 pypdf
+pandas
+openpyxl
