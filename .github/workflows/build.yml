@@ -25,11 +25,11 @@ jobs:
 
     - name: Build EXE with PyInstaller
       run: |
-        pyinstaller --noconsole --onefile --name "DocMaster" --collect-all customtkinter test.py
+        pyinstaller --noconsole --onefile --name "DocMaster_2026" --collect-all customtkinter test.py
       # ملاحظة: تأكد إن اسم ملف الكود بتاعك هو test.py زي ما هو مكتوب فوق
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: DocMaster-Windows-EXE
-        path: dist/DocMaster.exe
+        path: dist/DocMaster_2026.exe
