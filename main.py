@@ -16,7 +16,7 @@ class DocMaster(ctk.CTk):
         super().__init__()
 
         # --- تعديل الأبعاد: عرض أقل وطول مناسب ---
-        self.title("DocMaster")
+        self.title("DocMaster 2026")
         self.geometry("450x550")
         self.resizable(False, False)
 
@@ -38,7 +38,7 @@ class DocMaster(ctk.CTk):
             row=0, column=1, padx=5)
 
         # --- التبويبات (أزرار تحت بعض) ---
-        self.tabview = ctk.CTkTabview(self, width=580, height=220)
+        self.tabview = ctk.CTkTabview(self, width=380, height=220)
         self.tabview.pack(pady=10, padx=10)
 
         self.tab_img = self.tabview.add("Images")

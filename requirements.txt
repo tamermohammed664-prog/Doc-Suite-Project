@@ -1,0 +1,4 @@
+customtkinter
+img2pdf
+pymupdf
+pypdf
