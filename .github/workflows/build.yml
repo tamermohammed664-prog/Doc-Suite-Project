@@ -1,8 +1,8 @@
-name: Build Windows EXE
+name: Build DocMaster EXE
 
 on:
   push:
-    branches: [ main ] # أو اسم البرانش بتاعك (master مثلاً)
+    branches: [ main, master ] # عشان يشتغل سواء الفرع اسمه main أو master
 
 jobs:
   build:
@@ -25,11 +25,10 @@ jobs:
 
     - name: Build EXE with PyInstaller
       run: |
-        pyinstaller --noconsole --onefile --name "DocMaster_2026" --collect-all customtkinter test.py
-      # ملاحظة: تأكد إن اسم ملف الكود بتاعك هو test.py زي ما هو مكتوب فوق
-
+        pyinstaller --noconsole --onefile --icon="app_icon.ico" --name "DocMaster_Pro" --collect-all customtkinter main.py
+      
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: DocMaster-Windows-EXE
-        path: dist/DocMaster_2026.exe
+        name: DocMaster-Windows-Release
+        path: dist/DocMaster_Pro.exe
