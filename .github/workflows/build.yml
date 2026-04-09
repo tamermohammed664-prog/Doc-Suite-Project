@@ -1,8 +1,8 @@
-name: Build DocMaster EXE
+name: Build Windows EXE
 
 on:
   push:
-    branches: [ main, master ] # عشان يشتغل سواء الفرع اسمه main أو master
+    branches: [ main ]
 
 jobs:
   build:
@@ -20,15 +20,14 @@ jobs:
     - name: Install Dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pyinstaller
+        pip install customtkinter img2pdf pymupdf pypdf pyinstaller
 
-    - name: Build EXE with PyInstaller
+    - name: Build EXE
       run: |
         pyinstaller --noconsole --onefile --icon="app_icon.ico" --name "DocMaster_Pro" --collect-all customtkinter main.py
       
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: DocMaster-Windows-Release
+        name: DocMaster-Windows-EXE
         path: dist/DocMaster_Pro.exe
