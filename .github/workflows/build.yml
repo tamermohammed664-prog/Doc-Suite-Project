@@ -40,12 +40,16 @@ jobs:
         curl -L -o bin/tesseract/tessdata/eng.traineddata https://github.com/tesseract-ocr/tessdata_fast/raw/main/eng.traineddata
         curl -L -o bin/tesseract/tessdata/ara.traineddata https://github.com/tesseract-ocr/tessdata_fast/raw/main/ara.traineddata
 
-    - name: Build Executable with PyInstaller
+    - name: Build Executable with PyInstaller Direct
       run: |
-        pyinstaller --noconfirm DocNexus.spec
+        pyinstaller --noconfirm --onedir --windowed --name "DocNexus" --add-data "bin;bin" main.py
+
+    - name: Compress Build Output
+      run: |
+        powershell Compress-Archive -Path dist/DocNexus -DestinationPath dist/DocNexus-Windows.zip
 
     - name: Upload EXE Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: DocNexus-Windows-EXE
-        path: dist/DocNexus.exe
+        name: DocNexus-Windows-Application
+        path: dist/DocNexus-Windows.zip
