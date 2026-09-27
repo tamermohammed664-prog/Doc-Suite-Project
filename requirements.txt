@@ -6,3 +6,5 @@ pandas
 openpyxl
 pytesseract
 Pillow
+arabic_reshaper
+python-bidi
