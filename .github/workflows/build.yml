@@ -42,18 +42,18 @@ jobs:
 
     - name: Build Executable with PyInstaller Direct
       run: |
-        # فحص وجود app_icon.ico سواء في assets أو في المجلد الرئيسي واستخدامه في التجميع
+        # استخدام --onefile و --collect-all لإنتاج ملف واحد متكامل
         if (Test-Path "assets/app_icon.ico") {
-            pyinstaller --noconfirm --onedir --windowed --name "DocNexus" --icon="assets/app_icon.ico" --hidden-import "arabic_reshaper" --hidden-import "bidi" --hidden-import "bidi.algorithm" --add-data "bin;bin" --add-data "assets;assets" main.py
+            pyinstaller --noconfirm --onefile --windowed --name "DocNexus" --icon="assets/app_icon.ico" --collect-all "arabic_reshaper" --collect-all "bidi" --add-data "bin;bin" --add-data "assets;assets" main.py
         } elseif (Test-Path "app_icon.ico") {
-            pyinstaller --noconfirm --onedir --windowed --name "DocNexus" --icon="app_icon.ico" --hidden-import "arabic_reshaper" --hidden-import "bidi" --hidden-import "bidi.algorithm" --add-data "bin;bin" --add-data "app_icon.ico;." main.py
+            pyinstaller --noconfirm --onefile --windowed --name "DocNexus" --icon="app_icon.ico" --collect-all "arabic_reshaper" --collect-all "bidi" --add-data "bin;bin" --add-data "app_icon.ico;." main.py
         } else {
-            pyinstaller --noconfirm --onedir --windowed --name "DocNexus" --hidden-import "arabic_reshaper" --hidden-import "bidi" --hidden-import "bidi.algorithm" --add-data "bin;bin" main.py
+            pyinstaller --noconfirm --onefile --windowed --name "DocNexus" --collect-all "arabic_reshaper" --collect-all "bidi" --add-data "bin;bin" main.py
         }
 
     - name: Compress Build Output
       run: |
-        powershell Compress-Archive -Path dist/DocNexus -DestinationPath dist/DocNexus-Windows.zip
+        powershell Compress-Archive -Path dist/DocNexus.exe -DestinationPath dist/DocNexus-Windows.zip
 
     - name: Upload EXE Artifact
       uses: actions/upload-artifact@v4
