@@ -42,18 +42,18 @@ jobs:
 
     - name: Build Executable with PyInstaller Direct
       run: |
-        # استخدام --onefile و --collect-all لإنتاج ملف واحد متكامل
+        # استخدام --onedir للفتح اللحظي والسريع جداً للبرنامج
         if (Test-Path "assets/app_icon.ico") {
-            pyinstaller --noconfirm --onefile --windowed --name "DocNexus" --icon="assets/app_icon.ico" --collect-all "arabic_reshaper" --collect-all "bidi" --add-data "bin;bin" --add-data "assets;assets" main.py
+            pyinstaller --noconfirm --onedir --windowed --name "DocNexus" --icon="assets/app_icon.ico" --collect-all "arabic_reshaper" --collect-all "bidi" --add-data "bin;bin" --add-data "assets;assets" main.py
         } elseif (Test-Path "app_icon.ico") {
-            pyinstaller --noconfirm --onefile --windowed --name "DocNexus" --icon="app_icon.ico" --collect-all "arabic_reshaper" --collect-all "bidi" --add-data "bin;bin" --add-data "app_icon.ico;." main.py
+            pyinstaller --noconfirm --onedir --windowed --name "DocNexus" --icon="app_icon.ico" --collect-all "arabic_reshaper" --collect-all "bidi" --add-data "bin;bin" --add-data "app_icon.ico;." main.py
         } else {
-            pyinstaller --noconfirm --onefile --windowed --name "DocNexus" --collect-all "arabic_reshaper" --collect-all "bidi" --add-data "bin;bin" main.py
+            pyinstaller --noconfirm --onedir --windowed --name "DocNexus" --collect-all "arabic_reshaper" --collect-all "bidi" --add-data "bin;bin" main.py
         }
 
     - name: Compress Build Output
       run: |
-        powershell Compress-Archive -Path dist/DocNexus.exe -DestinationPath dist/DocNexus-Windows.zip
+        powershell Compress-Archive -Path dist/DocNexus -DestinationPath dist/DocNexus-Windows.zip
 
     - name: Upload EXE Artifact
       uses: actions/upload-artifact@v4
