@@ -20,7 +20,12 @@ except ImportError:
     TkinterDnD = None
 
 
-def fix_ar(text):
+_ARABIC_RESHAPER = arabic_reshaper.ArabicReshaper(
+    configuration={"support_ligatures": True}
+)
+
+
+def reshape_arabic_text(text):
     if text is None:
         return ""
     text = str(text)
@@ -30,7 +35,7 @@ def fix_ar(text):
     parts = []
     for line in text.splitlines():
         if any("\u0600" <= ch <= "\u06FF" for ch in line):
-            parts.append(get_display(arabic_reshaper.reshape(line), base_dir="R"))
+            parts.append(get_display(_ARABIC_RESHAPER.reshape(line), base_dir="R"))
         else:
             parts.append(line)
     return "\n".join(parts)
@@ -43,56 +48,29 @@ def _set_window_title(window, value):
 def _draw_temo_mark(canvas):
     white = "#f5f4ef"
     blue = "#168bd2"
-    canvas.create_line(12, 10, 51, 10, fill=white, width=5, capstyle=tk.ROUND)
-    canvas.create_line(32, 10, 32, 36, fill=white, width=5, capstyle=tk.ROUND)
-    canvas.create_line(61, 10, 83, 10, fill=white, width=5, capstyle=tk.ROUND)
-    canvas.create_line(61, 23, 83, 23, fill=blue, width=5, capstyle=tk.ROUND)
-    canvas.create_line(61, 36, 83, 36, fill=white, width=5, capstyle=tk.ROUND)
+    canvas.create_line(12, 10, 51, 10, fill=white, width=3, capstyle=tk.ROUND)
+    canvas.create_line(32, 10, 32, 36, fill=white, width=3, capstyle=tk.ROUND)
+    canvas.create_line(61, 10, 83, 10, fill=white, width=3, capstyle=tk.ROUND)
+    canvas.create_line(61, 23, 83, 23, fill=blue, width=3, capstyle=tk.ROUND)
+    canvas.create_line(61, 36, 83, 36, fill=white, width=3, capstyle=tk.ROUND)
     canvas.create_line(
         93, 36, 93, 10, 107, 24, 122, 10, 122, 36,
         fill=white,
-        width=5,
+        width=3,
         capstyle=tk.ROUND,
         joinstyle=tk.ROUND,
     )
-    canvas.create_oval(129, 7, 155, 40, outline=white, width=5)
+    canvas.create_oval(129, 7, 155, 40, outline=white, width=3)
     canvas.create_oval(139, 20, 146, 27, fill=blue, outline=blue)
+    canvas.scale("all", 0, 0, 0.58, 0.58)
 
 
-ar = fix_ar
+class AppLabel(ctk.CTkLabel):
+    pass
 
 
-def _apply_arabic_text(value):
-    if value is None:
-        return ""
-    value = str(value)
-    if any("\u0600" <= ch <= "\u06FF" for ch in value):
-        return fix_ar(value)
-    return value
-
-
-class ArLabel(ctk.CTkLabel):
-    def __init__(self, *args, **kwargs):
-        if "text" in kwargs:
-            kwargs["text"] = _apply_arabic_text(kwargs["text"])
-        super().__init__(*args, **kwargs)
-
-    def configure(self, *args, **kwargs):
-        if "text" in kwargs:
-            kwargs["text"] = _apply_arabic_text(kwargs["text"])
-        return super().configure(*args, **kwargs)
-
-
-class ArButton(ctk.CTkButton):
-    def __init__(self, *args, **kwargs):
-        if "text" in kwargs:
-            kwargs["text"] = _apply_arabic_text(kwargs["text"])
-        super().__init__(*args, **kwargs)
-
-    def configure(self, *args, **kwargs):
-        if "text" in kwargs:
-            kwargs["text"] = _apply_arabic_text(kwargs["text"])
-        return super().configure(*args, **kwargs)
+class AppButton(ctk.CTkButton):
+    pass
 
 
 class _NoDnDWrapper:
@@ -102,16 +80,8 @@ class _NoDnDWrapper:
 _DnDWrapperBase = TkinterDnD.DnDWrapper if TkinterDnD is not None else _NoDnDWrapper
 
 
-class ArEntry(ctk.CTkEntry, _DnDWrapperBase):
-    def __init__(self, *args, **kwargs):
-        if "placeholder_text" in kwargs:
-            kwargs["placeholder_text"] = _apply_arabic_text(kwargs["placeholder_text"])
-        super().__init__(*args, **kwargs)
-
-    def configure(self, *args, **kwargs):
-        if "placeholder_text" in kwargs:
-            kwargs["placeholder_text"] = _apply_arabic_text(kwargs["placeholder_text"])
-        return super().configure(*args, **kwargs)
+class DropEntry(ctk.CTkEntry, _DnDWrapperBase):
+    pass
 
 
 class _CTkDropRoot(ctk.CTk, _DnDWrapperBase):
@@ -213,6 +183,20 @@ def portable_poppler_path():
 
 IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff")
 OCR_LANGUAGES = "eng+ara"
+UI_COLORS = {
+    "background": "#0b1118",
+    "sidebar": "#0f1824",
+    "surface": "#141f2c",
+    "surface_alt": "#1b2938",
+    "border": "#2a3948",
+    "text": "#edf2f5",
+    "muted": "#9aa9b7",
+    "accent": "#2b9a7d",
+    "accent_hover": "#237c66",
+    "danger": "#82434b",
+    "danger_hover": "#6c3740",
+    "warning": "#c8954c",
+}
 
 STATUS_TEXT = {
     "app_title": "DocNexus",
@@ -243,29 +227,6 @@ STATUS_TEXT = {
     "status_table_error": "Failed to extract tables: {error}",
 }
 
-STATUS_ARABIC = {
-    "status_select_valid": "يرجى اختيار مجلد صور أو ملف صالح.",
-    "status_select_valid_pdf": "يرجى اختيار ملف PDF صالح.",
-    "status_select_valid_folder": "يرجى اختيار مجلد صور صالح.",
-    "status_merge": "جارٍ دمج الصور في مستند PDF...",
-    "status_done_pdf": "تم إنشاء ملف PDF بنجاح.",
-    "status_convert_each": "جارٍ تحويل كل صورة إلى ملف PDF...",
-    "status_done_multi_pdf": "تم إنشاء {count} ملفات PDF.",
-    "status_ocr": "جارٍ التعرف الضوئي على النصوص...",
-    "status_ocr_multi": "جارٍ التعرف الضوئي على عدة ملفات...",
-    "status_ocr_done": "تم إنشاء ملف Excel بنجاح.",
-    "status_ocr_done_multi": "تم إنشاء {count} ملفات Excel.",
-    "status_pdf_images": "جارٍ استخراج صفحات PDF إلى صور...",
-    "status_pdf_images_done": "تم استخراج الصور بنجاح.",
-    "status_pdf_table": "جارٍ استخراج بيانات الجداول...",
-    "status_pdf_table_done": "تم إنشاء ملف Excel بنجاح.",
-    "status_error": "حدث خطأ: {error}",
-    "status_ocr_error": "فشل التعرف الضوئي على النصوص: {error}",
-    "status_pdf_error": "تعذر تحويل ملف PDF: {error}",
-    "status_table_error": "تعذر استخراج الجداول: {error}",
-}
-
-
 class DocNexusApp(_CTkDropRoot):
     def __init__(self):
         super().__init__()
@@ -290,247 +251,289 @@ class DocNexusApp(_CTkDropRoot):
         self._output_path = ""
         self.selected_action = None
 
-        self.sidebar = ctk.CTkFrame(self, width=260, corner_radius=0, fg_color="#141b2d")
+        self.configure(fg_color=UI_COLORS["background"])
+        self.sidebar = ctk.CTkFrame(self, width=252, corner_radius=0, fg_color=UI_COLORS["sidebar"])
         self.sidebar.pack(side="left", fill="y")
         self.sidebar.pack_propagate(False)
 
-        self.logo = ArLabel(
+        self.logo = AppLabel(
             self.sidebar,
             text="DocNexus",
-            font=ctk.CTkFont(family="Impact", size=28),
-            text_color="#dbe8ff",
+            font=ctk.CTkFont(family="Segoe UI", size=25, weight="bold"),
+            text_color=UI_COLORS["text"],
         )
-        self.logo.pack(pady=(24, 20))
+        self.logo.pack(anchor="w", padx=22, pady=(24, 26))
 
-        btn_font = ctk.CTkFont(size=12, weight="bold")
-        sub_font = ctk.CTkFont(size=10)
+        self.sidebar_button_font = ctk.CTkFont(family="Segoe UI", size=12, weight="bold")
+        self.sidebar_section_font = ctk.CTkFont(family="Segoe UI", size=10, weight="bold")
 
         self.sidebar_buttons = {}
-        self.add_sidebar_group("PDF TOOLS", "أدوات PDF")
-        self.sidebar_buttons["images_single_pdf"] = self.add_bilingual_button("Images to One PDF", "صور إلى مستند واحد", self.images_to_single_pdf, btn_font, sub_font)
-        self.sidebar_buttons["images_multi_pdf"] = self.add_bilingual_button("Each Image to PDF", "كل صورة إلى مستند", self.images_to_multi_pdf, btn_font, sub_font)
-        self.sidebar_buttons["pdf_images"] = self.add_bilingual_button("PDF to Images", "تحويل المستند إلى صور", self.pdf_to_images, btn_font, sub_font)
-        self.add_sidebar_group("EXCEL TOOLS", "أدوات Excel")
-        self.sidebar_buttons["images_single_excel"] = self.add_bilingual_button("Images to One Excel", "صور إلى جدول بيانات", self.images_to_single_excel, btn_font, sub_font)
-        self.sidebar_buttons["images_multi_excel"] = self.add_bilingual_button("Each Image to Excel", "كل صورة إلى جدول", self.images_to_multi_excel, btn_font, sub_font)
-        self.sidebar_buttons["pdf_excel"] = self.add_bilingual_button("PDF to Excel", "تحويل المستند إلى جدول", self.pdf_to_excel, btn_font, sub_font)
+        self.add_sidebar_group("PDF TOOLS")
+        self.sidebar_buttons["images_single_pdf"] = self.add_sidebar_button("Images to PDF", self.images_to_single_pdf)
+        self.sidebar_buttons["images_multi_pdf"] = self.add_sidebar_button("Batch Images to PDF", self.images_to_multi_pdf)
+        self.sidebar_buttons["pdf_images"] = self.add_sidebar_button("PDF to Images", self.pdf_to_images)
+        self.add_sidebar_group("SPREADSHEET TOOLS")
+        self.sidebar_buttons["images_single_excel"] = self.add_sidebar_button("Images to Excel", self.images_to_single_excel)
+        self.sidebar_buttons["images_multi_excel"] = self.add_sidebar_button("Batch Images to Excel", self.images_to_multi_excel)
+        self.sidebar_buttons["pdf_excel"] = self.add_sidebar_button("PDF to Excel", self.pdf_to_excel)
 
         self.brand_footer = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        self.brand_footer.pack(side="bottom", pady=(0, 12))
+        self.brand_footer.pack(side="bottom", pady=(0, 14))
         self.brand_mark = tk.Canvas(
             self.brand_footer,
-            width=164,
-            height=46,
-            bg="#141b2d",
+            width=96,
+            height=28,
+            bg=UI_COLORS["sidebar"],
             bd=0,
             highlightthickness=0,
         )
         self.brand_mark.pack()
         _draw_temo_mark(self.brand_mark)
 
-        tagline_row = ctk.CTkFrame(self.brand_footer, fg_color="transparent")
-        tagline_row.pack(pady=(0, 1))
-        ctk.CTkFrame(tagline_row, width=15, height=2, fg_color="#168bd2").pack(
-            side="left", padx=(0, 6)
-        )
-        ArLabel(
-            tagline_row,
-            text="تقنية تعينك",
-            font=ctk.CTkFont(size=10),
-            text_color="#f5f4ef",
-        ).pack(side="left")
-        ctk.CTkFrame(tagline_row, width=15, height=2, fg_color="#168bd2").pack(
-            side="left", padx=(6, 0)
-        )
+        self.main_frame = ctk.CTkFrame(self, fg_color="transparent", corner_radius=0)
+        self.main_frame.pack(side="right", fill="both", expand=True, padx=28, pady=22)
 
-        self.main_frame = ctk.CTkFrame(self, fg_color="#111827", corner_radius=18)
-        self.main_frame.pack(side="right", fill="both", expand=True, padx=22, pady=22)
-
-        self.label = ArLabel(
+        self.label = AppLabel(
             self.main_frame,
-            text="Master Control Panel\nلوحة التحكم الرئيسية",
-            font=ctk.CTkFont(size=22, weight="bold"),
-        )
-        self.label.pack(pady=(24, 8))
-
-        self.selection_label = ArLabel(
-            self.main_frame,
-            text="Choose an action from the sidebar\nاختر إجراءً من القائمة الجانبية",
-            text_color="#a8b6cb",
-            font=ctk.CTkFont(size=13),
-        )
-        self.selection_label.pack(pady=(0, 20))
-
-        self.path_label = ArLabel(
-            self.main_frame,
-            text="Input file or folder\nملف الإدخال أو المجلد",
+            text="Document Processing",
             anchor="w",
-            font=ctk.CTkFont(size=13, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=25, weight="bold"),
+            text_color=UI_COLORS["text"],
         )
-        self.path_label.pack(fill="x", padx=42)
+        self.label.pack(fill="x", padx=24, pady=(12, 4))
 
-        input_row = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        input_row.pack(fill="x", padx=42, pady=(4, 14))
+        self.selection_label = AppLabel(
+            self.main_frame,
+            text="Convert images and PDFs, extract tables, and organize output.",
+            anchor="w",
+            text_color=UI_COLORS["muted"],
+            font=ctk.CTkFont(family="Segoe UI", size=13),
+        )
+        self.selection_label.pack(fill="x", padx=24, pady=(0, 14))
+
+        self.form_card = ctk.CTkFrame(
+            self.main_frame,
+            fg_color=UI_COLORS["surface"],
+            border_width=1,
+            border_color=UI_COLORS["border"],
+            corner_radius=14,
+        )
+        self.form_card.pack(fill="x", padx=16, pady=(0, 16))
+        self.form_heading = AppLabel(
+            self.form_card,
+            text="Files",
+            anchor="w",
+            font=ctk.CTkFont(family="Segoe UI", size=16, weight="bold"),
+            text_color=UI_COLORS["text"],
+        )
+        self.form_heading.pack(fill="x", padx=22, pady=(20, 14))
+
+        self.path_label = AppLabel(
+            self.form_card,
+            text="Input file or folder",
+            anchor="w",
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            text_color=UI_COLORS["muted"],
+        )
+        self.path_label.pack(fill="x", padx=22, pady=(0, 6))
+
+        input_row = ctk.CTkFrame(self.form_card, fg_color="transparent")
+        input_row.pack(fill="x", padx=22)
         input_row.grid_columnconfigure(0, weight=1)
+        input_row.grid_columnconfigure(1, minsize=140)
+        input_row.grid_columnconfigure(2, minsize=140)
 
-        self.path_entry = ArEntry(
+        self.path_entry = DropEntry(
             input_row,
-            placeholder_text="Select a file or folder...",
-            height=46,
-            corner_radius=9,
-            border_color="#60a5fa",
-            fg_color="#1e293b",
+            placeholder_text="Select a file or folder",
+            height=42,
+            corner_radius=8,
+            border_width=1,
+            border_color=UI_COLORS["border"],
+            fg_color=UI_COLORS["background"],
+            text_color=UI_COLORS["text"],
+            placeholder_text_color=UI_COLORS["muted"],
+            font=ctk.CTkFont(family="Segoe UI", size=12),
         )
         self.path_entry.grid(row=0, column=0, sticky="ew", padx=(0, 10))
         self._setup_drag_and_drop()
 
-        self.drag_drop_hint = ArLabel(
-            input_row,
+        self.drag_drop_hint = AppLabel(
+            self.form_card,
             text=self._drag_drop_hint_text(),
-            text_color="#8fa4c2",
-            font=ctk.CTkFont(size=11),
+            text_color=UI_COLORS["muted"],
+            font=ctk.CTkFont(family="Segoe UI", size=11),
             anchor="w",
         )
-        self.drag_drop_hint.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(5, 0))
+        self.drag_drop_hint.pack(fill="x", padx=22, pady=(7, 16))
 
-        self.browse_btn = ArButton(
+        self.browse_btn = AppButton(
             input_row,
-            text="Browse\nاستعراض",
-            font=btn_font,
+            text="Browse",
+            font=self.sidebar_button_font,
             command=self.browse,
-            fg_color="#3b82f6",
-            hover_color="#1d4ed8",
-            height=46,
-            width=148,
-            corner_radius=9,
+            fg_color=UI_COLORS["surface_alt"],
+            hover_color="#26384a",
+            text_color=UI_COLORS["text"],
+            height=42,
+            width=130,
+            corner_radius=8,
         )
-        self.browse_btn.grid(row=0, column=1)
+        self.browse_btn.grid(row=0, column=1, padx=(0, 10))
+        ctk.CTkFrame(input_row, fg_color="transparent", width=130, height=42).grid(row=0, column=2)
 
-        self.output_label = ArLabel(
-            self.main_frame,
-            text="Output folder (optional)\nمجلد الإخراج (اختياري)",
+        self.output_label = AppLabel(
+            self.form_card,
+            text="Output folder (optional)",
             anchor="w",
-            font=ctk.CTkFont(size=13, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            text_color=UI_COLORS["muted"],
         )
-        self.output_label.pack(fill="x", padx=42)
+        self.output_label.pack(fill="x", padx=22, pady=(0, 6))
 
-        output_row = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        output_row.pack(fill="x", padx=42, pady=(4, 20))
+        output_row = ctk.CTkFrame(self.form_card, fg_color="transparent")
+        output_row.pack(fill="x", padx=22, pady=(0, 18))
         output_row.grid_columnconfigure(0, weight=1)
+        output_row.grid_columnconfigure(1, minsize=140)
+        output_row.grid_columnconfigure(2, minsize=140)
 
-        self.output_entry = ArEntry(
+        self.output_entry = DropEntry(
             output_row,
-            placeholder_text="Choose an output folder...",
-            height=46,
-            corner_radius=9,
-            border_color="#3b82f6",
-            fg_color="#1e293b",
+            placeholder_text="Choose an output folder",
+            height=42,
+            corner_radius=8,
+            border_width=1,
+            border_color=UI_COLORS["border"],
+            fg_color=UI_COLORS["background"],
+            text_color=UI_COLORS["text"],
+            placeholder_text_color=UI_COLORS["muted"],
+            font=ctk.CTkFont(family="Segoe UI", size=12),
         )
         self.output_entry.grid(row=0, column=0, sticky="ew", padx=(0, 10))
 
-        self.output_btn = ArButton(
+        self.output_btn = AppButton(
             output_row,
-            text="Choose Folder\nاختيار مجلد",
-            font=btn_font,
+            text="Choose Folder",
+            font=self.sidebar_button_font,
             command=self.choose_output_directory,
-            fg_color="#334155",
-            hover_color="#475569",
-            height=46,
-            width=148,
-            corner_radius=9,
+            fg_color=UI_COLORS["surface_alt"],
+            hover_color="#26384a",
+            text_color=UI_COLORS["text"],
+            height=42,
+            width=130,
+            corner_radius=8,
         )
-        self.output_btn.grid(row=0, column=1, padx=(0, 8))
-
-        self.open_output_btn = ArButton(
+        self.output_btn.grid(row=0, column=1, padx=(0, 10))
+        self.open_output_btn = AppButton(
             output_row,
-            text="Open Output\nفتح مجلد الإخراج",
-            font=btn_font,
-            fg_color="#1f6feb",
-            hover_color="#1d4ed8",
+            text="Open Output",
+            font=self.sidebar_button_font,
             command=self.open_output_folder,
-            height=46,
-            width=160,
-            corner_radius=9,
+            fg_color=UI_COLORS["surface_alt"],
+            hover_color="#26384a",
+            text_color=UI_COLORS["text"],
+            height=42,
+            width=130,
+            corner_radius=8,
         )
         self.open_output_btn.grid(row=0, column=2)
 
-        self.progress_frame = ctk.CTkFrame(self.main_frame, fg_color="#182235", corner_radius=12)
-        self.progress_frame.pack(fill="x", padx=42, pady=(0, 20))
-        self.progress_heading = ArLabel(
-            self.progress_frame,
-            text="Processing Progress\nتقدم المعالجة",
-            anchor="w",
-            font=ctk.CTkFont(size=15, weight="bold"),
+        process_row = ctk.CTkFrame(self.form_card, fg_color="transparent")
+        process_row.pack(pady=(0, 20))
+        self.start_btn = AppButton(
+            process_row,
+            text="Start Processing",
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            command=self.start_processing,
+            fg_color=UI_COLORS["accent"],
+            hover_color=UI_COLORS["accent_hover"],
+            text_color="#ffffff",
+            height=44,
+            width=188,
+            corner_radius=8,
         )
-        self.progress_heading.pack(fill="x", padx=18, pady=(15, 8))
+        self.start_btn.grid(row=0, column=0, padx=(0, 8))
+        self.cancel_btn = AppButton(
+            process_row,
+            text="Cancel",
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            command=self.cancel_processing,
+            fg_color=UI_COLORS["surface_alt"],
+            hover_color="#26384a",
+            text_color=UI_COLORS["text"],
+            height=44,
+            width=136,
+            corner_radius=8,
+            state="disabled",
+        )
+        self.cancel_btn.grid(row=0, column=1)
+
+        self.progress_frame = ctk.CTkFrame(
+            self.main_frame,
+            fg_color=UI_COLORS["surface"],
+            border_width=1,
+            border_color=UI_COLORS["border"],
+            corner_radius=14,
+        )
+        self.progress_frame.pack(fill="x", padx=16, pady=(0, 14))
+        self.progress_heading = AppLabel(
+            self.progress_frame,
+            text="Processing Progress",
+            anchor="w",
+            font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"),
+            text_color=UI_COLORS["text"],
+        )
+        self.progress_heading.pack(fill="x", padx=22, pady=(18, 12))
 
         progress_row = ctk.CTkFrame(self.progress_frame, fg_color="transparent")
-        progress_row.pack(fill="x", padx=18)
+        progress_row.pack(fill="x", padx=22)
         progress_row.grid_columnconfigure(0, weight=1)
-        self.progress_bar = ctk.CTkProgressBar(progress_row, height=12, corner_radius=6)
+        self.progress_bar = ctk.CTkProgressBar(
+            progress_row,
+            height=10,
+            corner_radius=5,
+            fg_color=UI_COLORS["surface_alt"],
+            progress_color=UI_COLORS["accent"],
+        )
         self.progress_bar.set(0)
         self.progress_bar.grid(row=0, column=0, sticky="ew", padx=(0, 14), pady=5)
-        self.progress_percent = ArLabel(
+        self.progress_percent = AppLabel(
             progress_row,
             text="0%",
             width=54,
-            font=ctk.CTkFont(size=14, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            text_color=UI_COLORS["text"],
         )
         self.progress_percent.grid(row=0, column=1)
 
         self.progress_meta = ctk.CTkFrame(self.progress_frame, fg_color="transparent")
-        self.progress_meta.pack(fill="x", padx=18, pady=(4, 2))
-        self.elapsed_label = ArLabel(
+        self.progress_meta.pack(fill="x", padx=22, pady=(8, 0))
+        self.elapsed_label = AppLabel(
             self.progress_meta,
-            text="Elapsed: 00:00\nالوقت المنقضي: 00:00",
+            text="Elapsed: 00:00",
             anchor="w",
-            text_color="#a8b6cb",
+            text_color=UI_COLORS["muted"],
+            font=ctk.CTkFont(family="Segoe UI", size=11),
         )
-        self.elapsed_label.pack(side="left")
-        self.current_file_label = ArLabel(
+        self.elapsed_label.pack(side="right")
+        self.current_file_label = AppLabel(
             self.progress_frame,
-            text="Current file: None\nالملف الحالي: لا يوجد",
+            text="Current file: None",
             anchor="w",
-            text_color="#a8b6cb",
+            text_color=UI_COLORS["muted"],
+            font=ctk.CTkFont(family="Segoe UI", size=11),
             wraplength=650,
         )
-        self.current_file_label.pack(fill="x", padx=18, pady=(2, 14))
+        self.current_file_label.pack(fill="x", padx=22, pady=(2, 18))
 
-        process_row = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        process_row.pack(pady=(0, 10))
-        self.start_btn = ArButton(
-            process_row,
-            text="Start Processing\nبدء المعالجة",
-            font=ctk.CTkFont(size=14, weight="bold"),
-            command=self.start_processing,
-            fg_color="#16a36a",
-            hover_color="#128253",
-            height=52,
-            width=220,
-            corner_radius=9,
-        )
-        self.start_btn.grid(row=0, column=0, padx=6)
-        self.cancel_btn = ArButton(
-            process_row,
-            text="Cancel Process\nإلغاء المعالجة",
-            font=ctk.CTkFont(size=14, weight="bold"),
-            command=self.cancel_processing,
-            fg_color="#9f3434",
-            hover_color="#7f2929",
-            height=52,
-            width=220,
-            corner_radius=9,
-            state="disabled",
-        )
-        self.cancel_btn.grid(row=0, column=1, padx=6)
-
-        self.status_label = ArLabel(
+        self.status_label = AppLabel(
             self.main_frame,
-            text="Ready\nجاهز",
-            text_color="#60a5fa",
-            font=ctk.CTkFont(size=12, weight="bold"),
+            text="Ready",
+            text_color=UI_COLORS["muted"],
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            anchor="w",
         )
-        self.status_label.pack(side="bottom", pady=(6, 14))
+        self.status_label.pack(side="bottom", fill="x", padx=22, pady=(6, 4))
         self.after(50, self._drain_worker_queue)
 
     def _setup_drag_and_drop(self):
@@ -548,8 +551,8 @@ class DocNexusApp(_CTkDropRoot):
 
     def _drag_drop_hint_text(self):
         if self._drag_drop_enabled:
-            return "Drop one file or folder here, or browse\nأفلت ملفاً أو مجلداً هنا أو استعرض"
-        return "Drag-and-drop unavailable; use Browse\nالسحب والإفلات غير متاح؛ استخدم استعراض"
+            return "Drop a file or folder here, or choose Browse."
+        return "Drag and drop is unavailable. Choose Browse instead."
 
     def _handle_path_drop(self, event):
         try:
@@ -559,22 +562,22 @@ class DocNexusApp(_CTkDropRoot):
 
         if len(dropped_paths) != 1:
             self.update_status(
-                "Drop one file or folder at a time.\nأفلت ملفاً أو مجلداً واحداً في كل مرة.",
-                "#f59e0b",
+                "Choose one file or folder at a time.",
+                UI_COLORS["warning"],
             )
             return "break"
 
         dropped_path = Path(dropped_paths[0])
         if not dropped_path.exists():
             self.update_status(
-                "The dropped path does not exist.\nالمسار المُفلت غير موجود.",
-                "red",
+                "The selected path does not exist.",
+                UI_COLORS["danger"],
             )
             return "break"
         if dropped_path.is_file() and dropped_path.suffix.lower() not in IMAGE_EXTENSIONS + (".pdf",):
             self.update_status(
-                "Drop an image, PDF, or folder.\nأفلت صورة أو ملف PDF أو مجلداً.",
-                "#f59e0b",
+                "Choose an image, PDF, or folder.",
+                UI_COLORS["warning"],
             )
             return "break"
 
@@ -583,63 +586,57 @@ class DocNexusApp(_CTkDropRoot):
         self.input_path = str(dropped_path)
         self._source_path = ""
         self.update_status(
-            f"Selected: {dropped_path.name}\nتم الاختيار: {dropped_path.name}",
-            "#60a5fa",
+            f"Selected: {dropped_path.name}",
+            UI_COLORS["accent"],
         )
         return "copy"
 
-    def add_sidebar_group(self, english_text, arabic_text):
-        label = ArLabel(
+    def add_sidebar_group(self, english_text):
+        label = AppLabel(
             self.sidebar,
-            text=f"{english_text}\n{arabic_text}",
-            anchor="w",
-            text_color="#8fa4c2",
-            font=ctk.CTkFont(size=11, weight="bold"),
-        )
-        label.pack(fill="x", padx=18, pady=(12, 1))
-
-    def add_bilingual_button(self, english_text, arabic_text, command, font, sub_font):
-        frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        button = ArButton(
-            frame,
             text=english_text,
-            corner_radius=9,
-            font=font,
-            height=38,
-            fg_color="#2563eb",
-            hover_color="#1d4ed8",
-            command=lambda: self.select_action(command, english_text, arabic_text),
+            anchor="w",
+            text_color=UI_COLORS["muted"],
+            font=self.sidebar_section_font,
         )
-        button.pack(fill="x", pady=(0, 2))
+        label.pack(fill="x", padx=18, pady=(10, 6))
 
-        subtitle = ArLabel(
+    def add_sidebar_button(self, text, command):
+        frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        button = AppButton(
             frame,
-            text=arabic_text,
-            font=sub_font,
-            text_color="#b5c7ff",
+            text=text,
+            corner_radius=8,
+            font=self.sidebar_button_font,
+            height=38,
+            fg_color=UI_COLORS["surface_alt"],
+            hover_color="#26384a",
+            text_color=UI_COLORS["text"],
+            anchor="w",
+            command=lambda: self.select_action(command, text),
         )
-        subtitle.pack(fill="x", pady=(0, 6))
+        button.pack(fill="x")
 
-        frame.pack(pady=2, padx=18, fill="x")
+        frame.pack(pady=3, padx=14, fill="x")
         frame.action_button = button
         return frame
 
-    def select_action(self, command, english_text, arabic_text):
+    def select_action(self, command, text):
         self.selected_action = command
         for frame in self.sidebar_buttons.values():
-            frame.action_button.configure(fg_color="#2563eb")
+            frame.action_button.configure(fg_color=UI_COLORS["surface_alt"])
         for frame in self.sidebar_buttons.values():
-            if frame.action_button.cget("text") == english_text:
-                frame.action_button.configure(fg_color="#0f8a70")
+            if frame.action_button.cget("text") == text:
+                frame.action_button.configure(fg_color=UI_COLORS["accent"])
                 break
-        self.selection_label.configure(text=f"{english_text}\n{arabic_text}")
-        self.current_file_label.configure(text=f"Selected action: {english_text}\nالإجراء المحدد")
+        self.selection_label.configure(text=f"Selected tool: {text}")
+        self.status_label.configure(text=f"{text} selected", text_color=UI_COLORS["accent"])
 
     def start_processing(self):
         if self._task_running:
             return
         if self.selected_action is None:
-            self.update_status("Select an action first.\nاختر إجراءً أولاً.", "#f59e0b")
+            self.update_status("Choose a tool from the sidebar first.", UI_COLORS["warning"])
             return
 
         action = self.selected_action
@@ -648,8 +645,8 @@ class DocNexusApp(_CTkDropRoot):
         self._source_path = ""
         if not self.input_path or not Path(self.input_path).exists():
             self.update_status(
-                "Please select a valid input file or folder.\nيرجى اختيار ملف أو مجلد صالح.",
-                "#f59e0b",
+                "Choose a valid input file or folder.",
+                UI_COLORS["warning"],
             )
             return
 
@@ -661,10 +658,10 @@ class DocNexusApp(_CTkDropRoot):
         self._task_started_at = time.monotonic()
         self.progress_bar.set(0)
         self.progress_percent.configure(text="0%")
-        self.current_file_label.configure(text="Starting...\nجارٍ البدء...")
+        self.current_file_label.configure(text="Starting...")
         self.start_btn.configure(state="disabled")
         self.cancel_btn.configure(state="normal")
-        for widget in (self.path_entry, self.browse_btn, self.output_entry, self.output_btn):
+        for widget in (self.path_entry, self.browse_btn, self.output_entry, self.output_btn, self.open_output_btn):
             widget.configure(state="disabled")
         for frame in self.sidebar_buttons.values():
             frame.action_button.configure(state="disabled")
@@ -673,13 +670,13 @@ class DocNexusApp(_CTkDropRoot):
             threading.Thread(target=self._run_selected_action, args=(action,), daemon=True).start()
         except RuntimeError as exc:
             self._finish_task()
-            self.update_status(f"Could not start processing: {exc}\nتعذر بدء المعالجة", "red")
+            self.update_status(f"Could not start processing: {exc}", UI_COLORS["danger"])
 
     def _run_selected_action(self, action):
         try:
             self.update_status(
-                "Checking destination files...\nجارٍ التحقق من ملفات الوجهة...",
-                "#60a5fa",
+                "Checking destination files...",
+                UI_COLORS["muted"],
             )
             existing_outputs = self.find_existing_outputs(action)
             if self.is_cancelled():
@@ -701,7 +698,7 @@ class DocNexusApp(_CTkDropRoot):
                 return
             action()
         except Exception as exc:
-            self.update_status(f"Error: {exc}\nحدث خطأ أثناء المعالجة: {exc}", "red")
+            self.update_status(f"Error: {exc}", UI_COLORS["danger"])
         finally:
             self._worker_queue.put(("finished", None))
 
@@ -728,8 +725,8 @@ class DocNexusApp(_CTkDropRoot):
                         self._finish_task()
                     try:
                         self.status_label.configure(
-                            text=f"UI update failed: {exc}\nتعذر تحديث الواجهة",
-                            text_color="red",
+                            text=f"Interface update failed: {exc}",
+                            text_color=UI_COLORS["danger"],
                         )
                     except tk.TclError:
                         pass
@@ -751,13 +748,13 @@ class DocNexusApp(_CTkDropRoot):
                 self.progress_percent.configure(text=f"{round(progress * 100)}%")
                 name = Path(current_file).name if current_file else "None"
                 self.current_file_label.configure(
-                    text=f"Current file: {name}\nالملف الحالي: {name}"
+                    text=f"Current file: {name}"
                 )
         except Exception as exc:
             try:
                 self.status_label.configure(
-                    text=f"Progress update failed: {exc}\nتعذر تحديث التقدم",
-                    text_color="red",
+                    text=f"Progress update failed: {exc}",
+                    text_color=UI_COLORS["danger"],
                 )
             except tk.TclError:
                 pass
@@ -766,15 +763,15 @@ class DocNexusApp(_CTkDropRoot):
         self._task_running = False
         self.start_btn.configure(state="normal")
         self.cancel_btn.configure(state="disabled")
-        for widget in (self.path_entry, self.browse_btn, self.output_entry, self.output_btn):
+        for widget in (self.path_entry, self.browse_btn, self.output_entry, self.output_btn, self.open_output_btn):
             widget.configure(state="normal")
         for frame in self.sidebar_buttons.values():
             frame.action_button.configure(state="normal")
         if self._cancel_event.is_set():
-            self.update_status("Canceled safely.\nتم الإلغاء بأمان.", "#f59e0b")
-            self.current_file_label.configure(text="Canceled\nتم الإلغاء")
+            self.update_status("Canceled.", UI_COLORS["warning"])
+            self.current_file_label.configure(text="Canceled")
         else:
-            self.current_file_label.configure(text="Finished\nاكتملت المعالجة")
+            self.current_file_label.configure(text="Finished")
 
     def _tick_elapsed(self):
         if not self._task_running:
@@ -782,7 +779,7 @@ class DocNexusApp(_CTkDropRoot):
         elapsed = int(time.monotonic() - self._task_started_at)
         minutes, seconds = divmod(elapsed, 60)
         self.elapsed_label.configure(
-            text=f"Elapsed: {minutes:02d}:{seconds:02d}\nالوقت المنقضي: {minutes:02d}:{seconds:02d}"
+            text=f"Elapsed: {minutes:02d}:{seconds:02d}"
         )
         self.after(250, self._tick_elapsed)
 
@@ -798,73 +795,77 @@ class DocNexusApp(_CTkDropRoot):
         dialog = ctk.CTkToplevel(self)
         self._overwrite_dialog = dialog
         _set_window_title(dialog, "File Already Exists")
-        dialog.geometry("590x330")
+        dialog.configure(fg_color=UI_COLORS["background"])
+        dialog.geometry("520x260")
         dialog.resizable(False, False)
         dialog.transient(self)
         dialog.grab_set()
 
-        title = ArLabel(
+        title = AppLabel(
             dialog,
-            text="File Already Exists\nالملف موجود بالفعل",
-            font=ctk.CTkFont(size=19, weight="bold"),
+            text="File Already Exists",
+            font=ctk.CTkFont(family="Segoe UI", size=18, weight="bold"),
+            text_color=UI_COLORS["text"],
         )
-        title.pack(padx=24, pady=(22, 12))
+        title.pack(padx=24, pady=(24, 12))
 
-        message = ArLabel(
+        message = AppLabel(
             dialog,
             text=(
                 "A file with this name already exists in the destination folder. "
-                "Do you want to overwrite it or create a new version?\n"
-                "يوجد ملف بنفس الاسم في مجلد الإخراج. هل تريد استبداله أم إنشاء نسخة جديدة؟"
+                "Choose whether to replace it or create a new version."
             ),
-            wraplength=530,
-            justify="center",
-            font=ctk.CTkFont(size=13),
+            wraplength=460,
+            justify="left",
+            font=ctk.CTkFont(family="Segoe UI", size=12),
+            text_color=UI_COLORS["muted"],
         )
-        message.pack(fill="x", padx=26, pady=(0, 8))
+        message.pack(fill="x", padx=28, pady=(0, 12))
 
         if existing_outputs is not None:
-            count_label = ArLabel(
+            count_label = AppLabel(
                 dialog,
-                text=f"Existing file: {existing_outputs.name}\n"
-                f"الملف الموجود: {existing_outputs.name}",
-                text_color="#a8b6cb",
-                font=ctk.CTkFont(size=11),
+                text=f"Existing file: {existing_outputs.name}",
+                text_color=UI_COLORS["muted"],
+                font=ctk.CTkFont(family="Segoe UI", size=11),
             )
-            count_label.pack(pady=(0, 8))
+            count_label.pack(pady=(0, 10))
 
         buttons = ctk.CTkFrame(dialog, fg_color="transparent")
-        buttons.pack(side="bottom", pady=(10, 22))
+        buttons.pack(side="bottom", pady=(8, 22))
 
-        ArButton(
+        AppButton(
             buttons,
-            text="Overwrite\nاستبدال",
+            text="Replace",
             command=lambda: self._resolve_overwrite_choice("overwrite"),
-            fg_color="#b45309",
-            hover_color="#92400e",
-            width=150,
-            height=50,
-            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color=UI_COLORS["accent"],
+            hover_color=UI_COLORS["accent_hover"],
+            width=120,
+            height=40,
+            corner_radius=8,
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
         ).grid(row=0, column=0, padx=6)
-        ArButton(
+        AppButton(
             buttons,
-            text="Create New Version\nإنشاء نسخة جديدة",
+            text="Create New Version",
             command=lambda: self._resolve_overwrite_choice("new_version"),
-            fg_color="#16805d",
-            hover_color="#116849",
-            width=190,
-            height=50,
-            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color=UI_COLORS["surface_alt"],
+            hover_color="#26384a",
+            width=170,
+            height=40,
+            corner_radius=8,
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
         ).grid(row=0, column=1, padx=6)
-        ArButton(
+        AppButton(
             buttons,
-            text="Cancel\nإلغاء",
+            text="Cancel",
             command=lambda: self._resolve_overwrite_choice("cancel"),
-            fg_color="#475569",
-            hover_color="#334155",
-            width=130,
-            height=50,
-            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color=UI_COLORS["surface_alt"],
+            hover_color="#26384a",
+            width=100,
+            height=40,
+            corner_radius=8,
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
         ).grid(row=0, column=2, padx=6)
 
         dialog.protocol("WM_DELETE_WINDOW", lambda: self._resolve_overwrite_choice("cancel"))
@@ -891,8 +892,8 @@ class DocNexusApp(_CTkDropRoot):
             self._cancel_event.set()
             self.cancel_btn.configure(state="disabled")
             self.update_status(
-                "Cancel requested; finishing current item...\nتم طلب الإلغاء؛ جارٍ إنهاء العنصر الحالي...",
-                "#f59e0b",
+                "Cancel requested. Finishing the current item...",
+                UI_COLORS["warning"],
             )
 
     def open_output_folder(self):
@@ -908,8 +909,8 @@ class DocNexusApp(_CTkDropRoot):
                 folder = source if source.is_dir() else source.parent
         if folder is None or not folder.is_dir():
             self.update_status(
-                "Choose an existing output folder first.\nاختر مجلد إخراج موجوداً أولاً.",
-                "#f59e0b",
+                "Choose an existing output folder first.",
+                UI_COLORS["warning"],
             )
             return
         try:
@@ -918,9 +919,9 @@ class DocNexusApp(_CTkDropRoot):
             elif os.name == "posix":
                 subprocess.Popen(["xdg-open", str(folder)])
             else:
-                self.update_status("Opening folders is not supported.\nفتح المجلدات غير مدعوم.", "red")
+                self.update_status("Opening folders is not supported on this system.", UI_COLORS["danger"])
         except Exception as exc:
-            self.update_status(f"Could not open folder: {exc}\nتعذر فتح المجلد", "red")
+            self.update_status(f"Could not open folder: {exc}", UI_COLORS["danger"])
 
     def normalize_arabic_text(self, value):
         if value is None:
@@ -932,19 +933,13 @@ class DocNexusApp(_CTkDropRoot):
 
         if any("\u0600" <= ch <= "\u06FF" for ch in text):
             try:
-                return fix_ar(text)
+                return reshape_arabic_text(text)
             except Exception:
                 return text
         return text
 
     def t(self, key, **kwargs):
-        english = STATUS_TEXT.get(key, key)
-        arabic = STATUS_ARABIC.get(key)
-        if kwargs:
-            english = english.format(**kwargs)
-            if arabic:
-                arabic = arabic.format(**kwargs)
-        return f"{english}\n{arabic}" if arabic else english
+        return STATUS_TEXT.get(key, key).format(**kwargs)
 
     def browse(self):
         menu = tk.Menu(self, tearoff=False)
@@ -983,14 +978,15 @@ class DocNexusApp(_CTkDropRoot):
             self.output_entry.delete(0, "end")
             self.output_entry.insert(0, output_dir)
 
-    def update_status(self, text, color="#60a5fa"):
+    def update_status(self, text, color=None):
+        color = color or UI_COLORS["muted"]
         if threading.get_ident() == self._ui_thread_id:
             self.status_label.configure(text=text, text_color=color)
         else:
             self._worker_queue.put(("status", (text, color)))
 
     def show_error(self, key, error):
-        self.update_status(self.t(key, error=error), "red")
+        self.update_status(self.t(key, error=error), UI_COLORS["danger"])
 
     def resolve_output_dir(self, source_path):
         source_path = Path(source_path)
@@ -1113,7 +1109,7 @@ class DocNexusApp(_CTkDropRoot):
         source_path = Path(self._source_path)
         files = self.get_image_files(source_path)
         if not files:
-            self.update_status(self.t("status_select_valid"), "red")
+            self.update_status(self.t("status_select_valid"), UI_COLORS["danger"])
             return
 
         self.update_status(self.t("status_merge"))
@@ -1127,7 +1123,7 @@ class DocNexusApp(_CTkDropRoot):
             with output_path.open("wb") as file:
                 file.write(result)
             self.report_progress(1, 1, files[-1])
-            self.update_status(self.t("status_done_pdf"), "green")
+            self.update_status(self.t("status_done_pdf"), UI_COLORS["accent"])
         except Exception as exc:
             self.show_error("status_error", exc)
 
@@ -1137,7 +1133,7 @@ class DocNexusApp(_CTkDropRoot):
         source_path = Path(self._source_path)
         files = self.get_image_files(source_path)
         if not files:
-            self.update_status(self.t("status_select_valid_folder"), "red")
+            self.update_status(self.t("status_select_valid_folder"), UI_COLORS["danger"])
             return
 
         self.update_status(self.t("status_convert_each"))
@@ -1151,7 +1147,7 @@ class DocNexusApp(_CTkDropRoot):
                 with output_path.open("wb") as pdf_file:
                     pdf_file.write(img2pdf.convert(str(image_path)))
                 self.report_progress(index, len(files), image_path)
-            self.update_status(self.t("status_done_multi_pdf", count=len(files)), "green")
+            self.update_status(self.t("status_done_multi_pdf", count=len(files)), UI_COLORS["accent"])
         except Exception as exc:
             self.show_error("status_error", exc)
 
@@ -1165,7 +1161,7 @@ class DocNexusApp(_CTkDropRoot):
         source_path = Path(self._source_path)
         files = self.get_image_files(source_path)
         if not files:
-            self.update_status(self.t("status_select_valid"), "red")
+            self.update_status(self.t("status_select_valid"), UI_COLORS["danger"])
             return
 
         self.update_status(self.t("status_ocr"))
@@ -1193,7 +1189,7 @@ class DocNexusApp(_CTkDropRoot):
 
                     pd.DataFrame(rows).to_excel(writer, sheet_name=f"Page_{index}", index=False, header=False)
                     self.report_progress(index, len(files), image_path)
-            self.update_status(self.t("status_ocr_done"), "green")
+            self.update_status(self.t("status_ocr_done"), UI_COLORS["accent"])
         except Exception as exc:
             self.show_error("status_ocr_error", exc)
 
@@ -1207,7 +1203,7 @@ class DocNexusApp(_CTkDropRoot):
         source_path = Path(self._source_path)
         files = self.get_image_files(source_path)
         if not files:
-            self.update_status(self.t("status_select_valid_folder"), "red")
+            self.update_status(self.t("status_select_valid_folder"), UI_COLORS["danger"])
             return
 
         self.update_status(self.t("status_ocr_multi"))
@@ -1235,7 +1231,7 @@ class DocNexusApp(_CTkDropRoot):
                 with pd.ExcelWriter(excel_path, engine=openpyxl.__name__) as writer:
                     pd.DataFrame(rows).to_excel(writer, index=False, header=False)
                 self.report_progress(index, len(files), image_path)
-            self.update_status(self.t("status_ocr_done_multi", count=len(files)), "green")
+            self.update_status(self.t("status_ocr_done_multi", count=len(files)), UI_COLORS["accent"])
         except Exception as exc:
             self.show_error("status_ocr_error", exc)
 
@@ -1244,7 +1240,7 @@ class DocNexusApp(_CTkDropRoot):
 
         source_path = Path(self._source_path)
         if source_path.suffix.lower() != ".pdf" or not source_path.is_file():
-            self.update_status(self.t("status_select_valid_pdf"), "red")
+            self.update_status(self.t("status_select_valid_pdf"), UI_COLORS["danger"])
             return
 
         self.update_status(self.t("status_pdf_images"))
@@ -1282,7 +1278,7 @@ class DocNexusApp(_CTkDropRoot):
                         image.close()
                 if self.is_cancelled():
                     break
-            self.update_status(self.t("status_pdf_images_done"), "green")
+            self.update_status(self.t("status_pdf_images_done"), UI_COLORS["accent"])
         except Exception as exc:
             self.show_error("status_pdf_error", exc)
 
@@ -1293,7 +1289,7 @@ class DocNexusApp(_CTkDropRoot):
 
         source_path = Path(self._source_path)
         if source_path.suffix.lower() != ".pdf" or not source_path.is_file():
-            self.update_status(self.t("status_select_valid_pdf"), "red")
+            self.update_status(self.t("status_select_valid_pdf"), UI_COLORS["danger"])
             return
 
         self.update_status(self.t("status_pdf_table"))
@@ -1362,7 +1358,7 @@ class DocNexusApp(_CTkDropRoot):
             with pd.ExcelWriter(output_path, engine=openpyxl.__name__) as writer:
                 pd.DataFrame(data).to_excel(writer, index=False, header=False)
             self.report_progress(total_pages, total_pages, source_path.name)
-            self.update_status(self.t("status_pdf_table_done"), "green")
+            self.update_status(self.t("status_pdf_table_done"), UI_COLORS["accent"])
         except Exception as exc:
             self.show_error("status_table_error", exc)
 
