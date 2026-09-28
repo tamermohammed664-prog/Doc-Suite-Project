@@ -42,7 +42,12 @@ jobs:
 
     - name: Build Executable with PyInstaller Direct
       run: |
-        pyinstaller --noconfirm --onedir --windowed --name "DocNexus" --hidden-import "arabic_reshaper" --hidden-import "bidi" --hidden-import "bidi.algorithm" --add-data "bin;bin" main.py
+        # التحقق من وجود ملف الأيقونة وإضافتها لأمر التجميع، بالإضافة لضم مجلد assets كاملاً داخل البرنامج
+        if (Test-Path "assets/icon.ico") {
+            pyinstaller --noconfirm --onedir --windowed --name "DocNexus" --icon="assets/icon.ico" --hidden-import "arabic_reshaper" --hidden-import "bidi" --hidden-import "bidi.algorithm" --add-data "bin;bin" --add-data "assets;assets" main.py
+        } else {
+            pyinstaller --noconfirm --onedir --windowed --name "DocNexus" --hidden-import "arabic_reshaper" --hidden-import "bidi" --hidden-import "bidi.algorithm" --add-data "bin;bin" main.py
+        }
 
     - name: Compress Build Output
       run: |
