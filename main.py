@@ -30,10 +30,33 @@ def fix_ar(text):
     parts = []
     for line in text.splitlines():
         if any("\u0600" <= ch <= "\u06FF" for ch in line):
-            parts.append(get_display(arabic_reshaper.reshape(line)))
+            parts.append(get_display(arabic_reshaper.reshape(line), base_dir="R"))
         else:
             parts.append(line)
     return "\n".join(parts)
+
+
+def _set_window_title(window, value):
+    window.title(value)
+
+
+def _draw_temo_mark(canvas):
+    white = "#f5f4ef"
+    blue = "#168bd2"
+    canvas.create_line(12, 10, 51, 10, fill=white, width=5, capstyle=tk.ROUND)
+    canvas.create_line(32, 10, 32, 36, fill=white, width=5, capstyle=tk.ROUND)
+    canvas.create_line(61, 10, 83, 10, fill=white, width=5, capstyle=tk.ROUND)
+    canvas.create_line(61, 23, 83, 23, fill=blue, width=5, capstyle=tk.ROUND)
+    canvas.create_line(61, 36, 83, 36, fill=white, width=5, capstyle=tk.ROUND)
+    canvas.create_line(
+        93, 36, 93, 10, 107, 24, 122, 10, 122, 36,
+        fill=white,
+        width=5,
+        capstyle=tk.ROUND,
+        joinstyle=tk.ROUND,
+    )
+    canvas.create_oval(129, 7, 155, 40, outline=white, width=5)
+    canvas.create_oval(139, 20, 146, 27, fill=blue, outline=blue)
 
 
 ar = fix_ar
@@ -247,7 +270,7 @@ class DocNexusApp(_CTkDropRoot):
     def __init__(self):
         super().__init__()
 
-        self.title("DocNexus")
+        _set_window_title(self, "DocNexus")
         self.geometry("1200x760")
         self.minsize(980, 680)
         self._cancel_event = threading.Event()
@@ -262,6 +285,7 @@ class DocNexusApp(_CTkDropRoot):
         self._output_path_claims = set()
         self._task_running = False
         self._task_started_at = 0.0
+        self.input_path = None
         self._source_path = ""
         self._output_path = ""
         self.selected_action = None
@@ -291,13 +315,33 @@ class DocNexusApp(_CTkDropRoot):
         self.sidebar_buttons["images_multi_excel"] = self.add_bilingual_button("Each Image to Excel", "كل صورة إلى جدول", self.images_to_multi_excel, btn_font, sub_font)
         self.sidebar_buttons["pdf_excel"] = self.add_bilingual_button("PDF to Excel", "تحويل المستند إلى جدول", self.pdf_to_excel, btn_font, sub_font)
 
-        self.signature = ArLabel(
-            self.sidebar,
-            text="DocNexus",
-            font=ctk.CTkFont(family="Lucida Handwriting", size=22, slant="italic"),
-            text_color="#60a5fa",
+        self.brand_footer = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self.brand_footer.pack(side="bottom", pady=(0, 12))
+        self.brand_mark = tk.Canvas(
+            self.brand_footer,
+            width=164,
+            height=46,
+            bg="#141b2d",
+            bd=0,
+            highlightthickness=0,
         )
-        self.signature.pack(side="bottom", pady=20)
+        self.brand_mark.pack()
+        _draw_temo_mark(self.brand_mark)
+
+        tagline_row = ctk.CTkFrame(self.brand_footer, fg_color="transparent")
+        tagline_row.pack(pady=(0, 1))
+        ctk.CTkFrame(tagline_row, width=15, height=2, fg_color="#168bd2").pack(
+            side="left", padx=(0, 6)
+        )
+        ArLabel(
+            tagline_row,
+            text="تقنية تعينك",
+            font=ctk.CTkFont(size=10),
+            text_color="#f5f4ef",
+        ).pack(side="left")
+        ctk.CTkFrame(tagline_row, width=15, height=2, fg_color="#168bd2").pack(
+            side="left", padx=(6, 0)
+        )
 
         self.main_frame = ctk.CTkFrame(self, fg_color="#111827", corner_radius=18)
         self.main_frame.pack(side="right", fill="both", expand=True, padx=22, pady=22)
@@ -536,6 +580,8 @@ class DocNexusApp(_CTkDropRoot):
 
         self.path_entry.delete(0, "end")
         self.path_entry.insert(0, str(dropped_path))
+        self.input_path = str(dropped_path)
+        self._source_path = ""
         self.update_status(
             f"Selected: {dropped_path.name}\nتم الاختيار: {dropped_path.name}",
             "#60a5fa",
@@ -597,7 +643,17 @@ class DocNexusApp(_CTkDropRoot):
             return
 
         action = self.selected_action
-        self._source_path = self.path_entry.get().strip()
+        source_path = self.path_entry.get().strip()
+        self.input_path = source_path or None
+        self._source_path = ""
+        if not self.input_path or not Path(self.input_path).exists():
+            self.update_status(
+                "Please select a valid input file or folder.\nيرجى اختيار ملف أو مجلد صالح.",
+                "#f59e0b",
+            )
+            return
+
+        self._source_path = self.input_path
         self._output_path = self.output_entry.get().strip()
         self._output_path_claims.clear()
         self._cancel_event.clear()
@@ -608,6 +664,8 @@ class DocNexusApp(_CTkDropRoot):
         self.current_file_label.configure(text="Starting...\nجارٍ البدء...")
         self.start_btn.configure(state="disabled")
         self.cancel_btn.configure(state="normal")
+        for widget in (self.path_entry, self.browse_btn, self.output_entry, self.output_btn):
+            widget.configure(state="disabled")
         for frame in self.sidebar_buttons.values():
             frame.action_button.configure(state="disabled")
         self._tick_elapsed()
@@ -661,6 +719,7 @@ class DocNexusApp(_CTkDropRoot):
                     elif event == "confirm_overwrite":
                         self._show_overwrite_dialog(payload)
                     elif event == "finished":
+                        self._apply_pending_progress()
                         self._finish_task()
                 except Exception as exc:
                     if event == "confirm_overwrite":
@@ -675,28 +734,31 @@ class DocNexusApp(_CTkDropRoot):
                     except tk.TclError:
                         pass
         finally:
-            with self._progress_lock:
-                pending_progress = self._pending_progress
-                self._pending_progress = None
-            try:
-                if pending_progress is not None and self._task_running:
-                    progress, current_file = pending_progress
-                    self.progress_bar.set(progress)
-                    self.progress_percent.configure(text=f"{round(progress * 100)}%")
-                    name = Path(current_file).name if current_file else "None"
-                    self.current_file_label.configure(
-                        text=f"Current file: {name}\nالملف الحالي: {name}"
-                    )
-            except Exception as exc:
-                try:
-                    self.status_label.configure(
-                        text=f"Progress update failed: {exc}\nتعذر تحديث التقدم",
-                        text_color="red",
-                    )
-                except tk.TclError:
-                    pass
+            self._apply_pending_progress()
             try:
                 self.after(50, self._drain_worker_queue)
+            except tk.TclError:
+                pass
+
+    def _apply_pending_progress(self):
+        with self._progress_lock:
+            pending_progress = self._pending_progress
+            self._pending_progress = None
+        try:
+            if pending_progress is not None and self._task_running:
+                progress, current_file = pending_progress
+                self.progress_bar.set(progress)
+                self.progress_percent.configure(text=f"{round(progress * 100)}%")
+                name = Path(current_file).name if current_file else "None"
+                self.current_file_label.configure(
+                    text=f"Current file: {name}\nالملف الحالي: {name}"
+                )
+        except Exception as exc:
+            try:
+                self.status_label.configure(
+                    text=f"Progress update failed: {exc}\nتعذر تحديث التقدم",
+                    text_color="red",
+                )
             except tk.TclError:
                 pass
 
@@ -704,6 +766,8 @@ class DocNexusApp(_CTkDropRoot):
         self._task_running = False
         self.start_btn.configure(state="normal")
         self.cancel_btn.configure(state="disabled")
+        for widget in (self.path_entry, self.browse_btn, self.output_entry, self.output_btn):
+            widget.configure(state="normal")
         for frame in self.sidebar_buttons.values():
             frame.action_button.configure(state="normal")
         if self._cancel_event.is_set():
@@ -733,7 +797,7 @@ class DocNexusApp(_CTkDropRoot):
 
         dialog = ctk.CTkToplevel(self)
         self._overwrite_dialog = dialog
-        dialog.title(self.normalize_arabic_text("File Already Exists / الملف موجود بالفعل"))
+        _set_window_title(dialog, "File Already Exists")
         dialog.geometry("590x330")
         dialog.resizable(False, False)
         dialog.transient(self)
@@ -883,16 +947,35 @@ class DocNexusApp(_CTkDropRoot):
         return f"{english}\n{arabic}" if arabic else english
 
     def browse(self):
-        file_path = filedialog.askopenfilename(title="Select an image or PDF file")
-        if file_path:
-            self.path_entry.delete(0, "end")
-            self.path_entry.insert(0, file_path)
-            return
+        menu = tk.Menu(self, tearoff=False)
+        menu.add_command(label="Select a file...", command=self.browse_file)
+        menu.add_command(label="Select a folder...", command=self.browse_folder)
+        menu.tk_popup(
+            self.browse_btn.winfo_rootx(),
+            self.browse_btn.winfo_rooty() + self.browse_btn.winfo_height(),
+        )
 
-        directory = filedialog.askdirectory(title="Select a folder")
+    def browse_file(self):
+        self.path_entry.delete(0, "end")
+        self.input_path = None
+        self._source_path = ""
+        file_path = filedialog.askopenfilename(
+            parent=self,
+            title="Select an image or PDF file",
+            filetypes=[("Images and PDF", "*.png *.jpg *.jpeg *.bmp *.tif *.tiff *.pdf"), ("All files", "*.*")],
+        )
+        if file_path:
+            self.path_entry.insert(0, file_path)
+            self.input_path = file_path
+
+    def browse_folder(self):
+        self.path_entry.delete(0, "end")
+        self.input_path = None
+        self._source_path = ""
+        directory = filedialog.askdirectory(parent=self, title="Select a folder")
         if directory:
-            self.path_entry.delete(0, "end")
             self.path_entry.insert(0, directory)
+            self.input_path = directory
 
     def choose_output_directory(self):
         output_dir = filedialog.askdirectory(title="Choose output folder")
