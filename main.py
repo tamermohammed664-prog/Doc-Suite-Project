@@ -10,35 +10,12 @@ import tkinter as tk
 from tkinter import filedialog
 
 import customtkinter as ctk
-import arabic_reshaper
-from bidi.algorithm import get_display
 
 try:
     from tkinterdnd2 import DND_FILES, TkinterDnD
 except ImportError:
     DND_FILES = None
     TkinterDnD = None
-
-
-_ARABIC_RESHAPER = arabic_reshaper.ArabicReshaper(
-    configuration={"support_ligatures": True}
-)
-
-
-def reshape_arabic_text(text):
-    if text is None:
-        return ""
-    text = str(text)
-    if not text:
-        return ""
-
-    parts = []
-    for line in text.splitlines():
-        if any("\u0600" <= ch <= "\u06FF" for ch in line):
-            parts.append(get_display(_ARABIC_RESHAPER.reshape(line), base_dir="R"))
-        else:
-            parts.append(line)
-    return "\n".join(parts)
 
 
 def _set_window_title(window, value):
@@ -924,21 +901,6 @@ class DocNexusApp(_CTkDropRoot):
         except Exception as exc:
             self.update_status(f"Could not open folder: {exc}", UI_COLORS["danger"])
 
-    def normalize_arabic_text(self, value):
-        if value is None:
-            return ""
-
-        text = str(value).strip()
-        if not text:
-            return text
-
-        if any("\u0600" <= ch <= "\u06FF" for ch in text):
-            try:
-                return reshape_arabic_text(text)
-            except Exception:
-                return text
-        return text
-
     def t(self, key, **kwargs):
         return STATUS_TEXT.get(key, key).format(**kwargs)
 
@@ -1174,8 +1136,11 @@ class DocNexusApp(_CTkDropRoot):
                     if self.is_cancelled():
                         break
                     self.report_progress(index - 1, len(files), image_path)
-                    with Image.open(image_path) as image:
-                        text = pytesseract.image_to_string(image, lang=OCR_LANGUAGES)
+                    try:
+                        with Image.open(image_path) as image:
+                            text = pytesseract.image_to_string(image, lang=OCR_LANGUAGES)
+                    except Exception:
+                        text = ""
                     if self.is_cancelled():
                         break
 
@@ -1183,8 +1148,7 @@ class DocNexusApp(_CTkDropRoot):
                     for line in text.splitlines():
                         cleaned = line.strip()
                         if cleaned:
-                            normalized = self.normalize_arabic_text(cleaned)
-                            rows.append(normalized.split())
+                            rows.append(cleaned.split())
                     if not rows:
                         rows = [["لا توجد بيانات أو نصوص مستخرجة"]]
 
@@ -1223,8 +1187,11 @@ class DocNexusApp(_CTkDropRoot):
                 if self.is_cancelled():
                     break
                 self.report_progress(index - 1, len(files), image_path)
-                with Image.open(image_path) as image:
-                    text = pytesseract.image_to_string(image, lang=OCR_LANGUAGES)
+                try:
+                    with Image.open(image_path) as image:
+                        text = pytesseract.image_to_string(image, lang=OCR_LANGUAGES)
+                except Exception:
+                    text = ""
                 if self.is_cancelled():
                     break
 
@@ -1232,8 +1199,7 @@ class DocNexusApp(_CTkDropRoot):
                 for line in text.splitlines():
                     cleaned = line.strip()
                     if cleaned:
-                        normalized = self.normalize_arabic_text(cleaned)
-                        rows.append(normalized.split())
+                        rows.append(cleaned.split())
                 if not rows:
                     rows = [["لا توجد بيانات أو نصوص مستخرجة"]]
 
@@ -1334,7 +1300,7 @@ class DocNexusApp(_CTkDropRoot):
                         for line in page_text.splitlines():
                             cleaned = line.strip()
                             if cleaned:
-                                data.append(self.normalize_arabic_text(cleaned).split())
+                                data.append(cleaned.split())
                     else:
                         if convert_from_path is None:
                             from pdf2image import convert_from_path as pdf_to_images
@@ -1363,7 +1329,7 @@ class DocNexusApp(_CTkDropRoot):
                                     for line in scanned_text.splitlines():
                                         cleaned = line.strip()
                                         if cleaned:
-                                            data.append(self.normalize_arabic_text(cleaned).split())
+                                            data.append(cleaned.split())
                             finally:
                                 for image in page_images:
                                     image.close()
