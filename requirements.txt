@@ -2,10 +2,13 @@ customtkinter
 img2pdf
 pymupdf
 pypdf
+pdfplumber
 pandas
 openpyxl
 pytesseract
 Pillow
 arabic_reshaper
 python-bidi
+packaging
+setuptools
 pyinstaller
