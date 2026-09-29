@@ -8,3 +8,4 @@ pytesseract
 Pillow
 arabic_reshaper
 python-bidi
+pyinstaller
