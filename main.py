@@ -117,9 +117,10 @@ def _runtime_roots():
     bundled_root = getattr(sys, "_MEIPASS", None)
     if bundled_root:
         roots.append(Path(bundled_root))
-    roots.append(Path(__file__).resolve().parent)
     if getattr(sys, "frozen", False):
         roots.append(Path(sys.executable).resolve().parent)
+    roots.append(Path(__file__).resolve().parent)
+    roots.append(Path(sys.executable).resolve().parent)
     return list(dict.fromkeys(roots))
 
 
@@ -1185,10 +1186,19 @@ class DocNexusApp(_CTkDropRoot):
                             normalized = self.normalize_arabic_text(cleaned)
                             rows.append(normalized.split())
                     if not rows:
-                        rows = [["No text detected"]]
+                        rows = [["لا توجد بيانات أو نصوص مستخرجة"]]
 
                     pd.DataFrame(rows).to_excel(writer, sheet_name=f"Page_{index}", index=False, header=False)
+                    writer.sheets[f"Page_{index}"].sheet_view.rightToLeft = True
                     self.report_progress(index, len(files), image_path)
+                if not writer.sheets:
+                    pd.DataFrame([["لا توجد بيانات أو نصوص مستخرجة"]]).to_excel(
+                        writer,
+                        sheet_name="OCR_Result",
+                        index=False,
+                        header=False,
+                    )
+                    writer.sheets["OCR_Result"].sheet_view.rightToLeft = True
             self.update_status(self.t("status_ocr_done"), UI_COLORS["accent"])
         except Exception as exc:
             self.show_error("status_ocr_error", exc)
@@ -1225,11 +1235,17 @@ class DocNexusApp(_CTkDropRoot):
                         normalized = self.normalize_arabic_text(cleaned)
                         rows.append(normalized.split())
                 if not rows:
-                    rows = [["No text detected"]]
+                    rows = [["لا توجد بيانات أو نصوص مستخرجة"]]
 
                 excel_path = self.get_output_path(output_dir, image_path.stem, ".xlsx")
                 with pd.ExcelWriter(excel_path, engine=openpyxl.__name__) as writer:
-                    pd.DataFrame(rows).to_excel(writer, index=False, header=False)
+                    pd.DataFrame(rows).to_excel(
+                        writer,
+                        sheet_name="OCR_Result",
+                        index=False,
+                        header=False,
+                    )
+                    writer.sheets["OCR_Result"].sheet_view.rightToLeft = True
                 self.report_progress(index, len(files), image_path)
             self.update_status(self.t("status_ocr_done_multi", count=len(files)), UI_COLORS["accent"])
         except Exception as exc:
@@ -1310,9 +1326,10 @@ class DocNexusApp(_CTkDropRoot):
                         character.isprintable() and not character.isspace()
                         for character in page_text
                     )
-                    table = page.extract_table()
-                    if table:
-                        data.extend(table)
+                    tables = page.extract_tables()
+                    if tables:
+                        for table in tables:
+                            data.extend(table)
                     elif has_readable_text:
                         for line in page_text.splitlines():
                             cleaned = line.strip()
@@ -1355,8 +1372,16 @@ class DocNexusApp(_CTkDropRoot):
             if self.is_cancelled():
                 return
             output_path = self.get_output_path(output_dir, source_path.stem, ".xlsx")
+            if not data:
+                data = [["لا توجد بيانات أو نصوص مستخرجة"]]
             with pd.ExcelWriter(output_path, engine=openpyxl.__name__) as writer:
-                pd.DataFrame(data).to_excel(writer, index=False, header=False)
+                pd.DataFrame(data).to_excel(
+                    writer,
+                    sheet_name="OCR_Result",
+                    index=False,
+                    header=False,
+                )
+                writer.sheets["OCR_Result"].sheet_view.rightToLeft = True
             self.report_progress(total_pages, total_pages, source_path.name)
             self.update_status(self.t("status_pdf_table_done"), UI_COLORS["accent"])
         except Exception as exc:
