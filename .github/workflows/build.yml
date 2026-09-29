@@ -21,38 +21,40 @@ jobs:
     - name: Install Build Dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pyinstaller arabic_reshaper python-bidi
         pip install -r requirements.txt
 
     - name: Setup Bundled Binaries (Poppler & Tesseract)
       run: |
-        # 1. تحميل وتجهيز Poppler المحمول
+        # 1. تحميل وتجهيز Poppler المحمول المباشر
         curl -L -o poppler.zip https://github.com/oschwartz10612/poppler-windows/releases/download/v24.08.0-0/Release-24.08.0-0.zip
         powershell Expand-Archive -Path poppler.zip -DestinationPath bin_temp
         New-Item -ItemType Directory -Force -Path bin/poppler
         Get-ChildItem -Path bin_temp/*/* | Copy-Item -Destination bin/poppler -Recurse -Force
         Remove-Item -Recurse -Force bin_temp, poppler.zip
 
-        # 2. إنشاء مجلدات Tesseract والملفات المطلوبة
+        # 2. إنشاء مجلدات Tesseract وملفات اللغات المطلوبة لسرعة الفتح والـ OCR
         New-Item -ItemType Directory -Force -Path bin/tesseract/tessdata
         
-        # 3. تحميل بيانات اللغات لـ OCR (عربي وإنجليزي)
+        # 3. تحميل بيانات اللغات المحسنة (Fast) لسرعة معالجة النصوص
         curl -L -o bin/tesseract/tessdata/eng.traineddata https://github.com/tesseract-ocr/tessdata_fast/raw/main/eng.traineddata
         curl -L -o bin/tesseract/tessdata/ara.traineddata https://github.com/tesseract-ocr/tessdata_fast/raw/main/ara.traineddata
 
     - name: Build Executable with PyInstaller Direct
       run: |
-        # استخدام --onedir للفتح اللحظي والسريع جداً للبرنامج
+        # نظام --onedir يضمن الفتح اللحظي للبرنامج لأن الملفات تكون مفكوكة وجاهزة في المجلد
+        $COLLECT_FLAGS = "--collect-all customtkinter --collect-all PIL --collect-all fitz --collect-all pytesseract --collect-all img2pdf --collect-all pypdf --collect-all pandas --collect-all openpyxl --collect-all arabic_reshaper --collect-all bidi"
+
         if (Test-Path "assets/app_icon.ico") {
-            pyinstaller --noconfirm --onedir --windowed --name "DocNexus" --icon="assets/app_icon.ico" --collect-all "arabic_reshaper" --collect-all "bidi" --add-data "bin;bin" --add-data "assets;assets" main.py
+            Invoke-Expression "pyinstaller --noconfirm --onedir --windowed --name 'DocNexus' --icon='assets/app_icon.ico' $COLLECT_FLAGS --add-data 'bin;bin' --add-data 'assets;assets' main.py"
         } elseif (Test-Path "app_icon.ico") {
-            pyinstaller --noconfirm --onedir --windowed --name "DocNexus" --icon="app_icon.ico" --collect-all "arabic_reshaper" --collect-all "bidi" --add-data "bin;bin" --add-data "app_icon.ico;." main.py
+            Invoke-Expression "pyinstaller --noconfirm --onedir --windowed --name 'DocNexus' --icon='app_icon.ico' $COLLECT_FLAGS --add-data 'bin;bin' --add-data 'app_icon.ico;.' main.py"
         } else {
-            pyinstaller --noconfirm --onedir --windowed --name "DocNexus" --collect-all "arabic_reshaper" --collect-all "bidi" --add-data "bin;bin" main.py
+            Invoke-Expression "pyinstaller --noconfirm --onedir --windowed --name 'DocNexus' $COLLECT_FLAGS --add-data 'bin;bin' main.py"
         }
 
     - name: Compress Build Output
       run: |
+        # ضغط مجلد التطبيق كاملاً ليقوم العميل بفكه مرة واحدة فقط على جهازه والتشغيل المباشر
         powershell Compress-Archive -Path dist/DocNexus -DestinationPath dist/DocNexus-Windows.zip
 
     - name: Upload EXE Artifact
